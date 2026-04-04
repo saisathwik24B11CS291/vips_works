@@ -214,7 +214,7 @@ async function handleSearch(query) {
 
             return `
                 <div class="user-card">
-                    <div class="card-left" onclick="window.location.href='../friendprofile.html?id=${user._id}'">
+                    <div class="card-left" onclick="window.location.href='/friendprofile.html?id=${user._id}'">
                         <div class="user-pic-wrapper">
                             <img src="${user.profilePicture ? API_BASE + user.profilePicture : 'https://via.placeholder.com/50'}" class="user-pic">
                             ${user.isOnline ? '<div class="status-dot"></div>' : ''}
