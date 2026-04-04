@@ -60,7 +60,7 @@
 </div>
 
     <script>
-    const API_BASE = "https://vips_works.onrender.com";
+    const API_BASE = window.location.origin;
     const urlParams = new URLSearchParams(window.location.search);
     const selectedJob = urlParams.get('job');
     const selectedCategory = urlParams.get('category');
@@ -355,7 +355,7 @@ try{
 btn.disabled = true;
 btn.innerHTML = "⏳";
 
-const res = await fetch(`https://vips_works.onrender.com/api/jobs/invite/${workerId}`,{
+const res = await fetch(window.location.origin + "/api/jobs/invite/${workerId}",{
 method:"POST",
 headers:{
 "Content-Type":"application/json",
@@ -401,7 +401,7 @@ try{
 btn.disabled = true;
 btn.innerHTML = "⏳";
 
-const res = await fetch(`https://vips_works.onrender.com/api/jobs/invite/${workerId}`,{
+const res = await fetch(window.location.origin + "/api/jobs/invite/${workerId}",{
 method:"DELETE",
 headers:{
 "Content-Type":"application/json",

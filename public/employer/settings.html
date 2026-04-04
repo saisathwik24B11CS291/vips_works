@@ -147,7 +147,7 @@
     <div id="toast">Settings updated</div>
 
     <script>
-        const API_BASE = "https://vips_works.onrender.com";
+        const API_BASE = window.location.origin;
         const token = localStorage.getItem('token');
         
         const privacyToggle = document.getElementById('follow-privacy-toggle');

@@ -121,7 +121,7 @@
 
 <script>
     // --- 1. CONFIGURATION & GLOBALS ---
-    const API_BASE = "https://vips_works.onrender.com";
+    const API_BASE = window.location.origin;
     // We get these globally, but we also re-check them inside functions for safety
     let token = localStorage.getItem('token');
     let myId = localStorage.getItem('userId');

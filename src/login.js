@@ -6,7 +6,7 @@ import './styles.css';
 document.addEventListener('DOMContentLoaded', () => {
     
     // Use the full URL to Port 5000 to avoid "Cannot connect" errors
-    const API_URL = 'https://vips_works.onrender.com/api/auth'; 
+    const API_URL = window.location.origin + "/api/auth"; 
     
     const loginForm = document.getElementById('login-form');
     const messageElement = document.getElementById('message');

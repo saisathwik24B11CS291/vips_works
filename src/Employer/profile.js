@@ -1,4 +1,4 @@
-const SERVER_URL = 'https://vips_works.onrender.com';
+const SERVER_URL = window.location.origin;
 const API_URL = `${SERVER_URL}/api/auth`; // Matches your server.js auth routes
 
 document.addEventListener('DOMContentLoaded', () => {

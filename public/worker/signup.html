@@ -248,7 +248,7 @@
 
             try {
                 // 3. Connect to your server
-                const response = await fetch('https://vips_works.onrender.com/api/auth/signup', {
+                const response = await fetch(window.location.origin + "/api/auth/signup", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ role, username, email, password, phone })

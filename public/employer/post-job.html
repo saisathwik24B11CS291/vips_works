@@ -128,7 +128,7 @@ location: document.getElementById('location').value
 };
 
             try {
-                const response = await fetch('https://vips_works.onrender.comapi/jobs/create', {
+                const response = await fetch(window.location.origin + "/api/jobs/create", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(jobData)

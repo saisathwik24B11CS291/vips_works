@@ -99,7 +99,7 @@
 </div>
 
 <script>
-    const API_BASE = "https://vips_works.onrender.com";
+    const API_BASE = window.location.origin;
 const token = localStorage.getItem('token');
 const userRole = localStorage.getItem('userRole'); 
 let myRole = userRole || ""; // cache current role so we can gate employer->employer visibility

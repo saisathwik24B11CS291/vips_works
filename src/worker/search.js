@@ -1,4 +1,4 @@
-const API_BASE = "https://vips_works.onrender.com";
+const API_BASE = window.location.origin;
 const token = localStorage.getItem('token');
 
 // Function to fetch users from backend
