@@ -18,7 +18,7 @@
         
         const list = document.getElementById('following-list');
         list.innerHTML = employers.map(emp => `
-            <div class="user-card" onclick="window.location.href='../friendProfile.html?id=${emp._id}'">
+            <div class="user-card" onclick="window.location.href='../friendprofile.html?id=${emp._id}'">
                 <img src="${API_BASE}${emp.profilePicture}" class="avatar">
                 <div class="details">
                     <b>${emp.companyName || emp.username}</b>
