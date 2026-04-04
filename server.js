@@ -1,3 +1,5 @@
+// Use Render's dynamic port or fallback to 5000 for local dev
+const PORT = process.env.PORT || 5000;
 require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'change_me_in_env';
 const express = require('express'); 
@@ -39,7 +41,7 @@ const port = process.env.PORT || 5000; // ✅ use Render PORT if available
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
 const saltRounds = 10; 
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/vips_db"; 
+
 
 // Mail + Google clients
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -1524,17 +1526,18 @@ app.use('/api/employer', employerRoutes);
 app.use('/api/messages', messageRoutes);
 
 // --- START SERVER ---
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    console.error('❌ MONGODB_URI is missing in environment variables!');
+    process.exit(1);
+}
+
 mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log("✅ Database Connected Successfully");
-
-    // Routes after DB connection
-    app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
-    app.use('/api/workers', workerRoutes);
-    app.use('/api/employers', employerRoutes);
-
-    // Start server
-    const port = process.env.PORT || 5000;
-    app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
-  })
-  .catch(err => console.error("❌ MongoDB Connection Error:", err));
+    .then(() => {
+        console.log('✅ Database Connected Successfully');
+        app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    })
+    .catch(err => {
+        console.error('❌ MongoDB Connection Error:', err);
+        process.exit(1); // Stop server if DB connection fails
+    });
