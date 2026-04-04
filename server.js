@@ -25,9 +25,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change_me_in_env') {
 
 
 // 2. In your authMiddleware
-app.get("/", (req, res) => {
-  res.send("VIPs Backend is Running 🚀");
-});
+
 
 
 // --- MODELS ---
@@ -157,9 +155,12 @@ app.use((req,res,next)=>{
     sanitize(req.query);
     next();
 });
-
+app.get("/", (req, res) => {
+  res.send("VIPs Backend is Running 🚀");
+});
 // health check
 app.get('/health', (req,res)=> res.json({status:'ok', time:new Date().toISOString()}));
+
 // expose Google client id to frontend (no secrets)
 app.get('/api/config/google-client', (req,res)=>{
     if(!GOOGLE_CLIENT_ID){
