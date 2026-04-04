@@ -156,9 +156,7 @@ app.use((req,res,next)=>{
     sanitize(req.query);
     next();
 });
-app.get("/", (req, res) => {
-  res.send("VIPs Backend is Running 🚀");
-});
+app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
 // health check
 app.get('/health', (req,res)=> res.json({status:'ok', time:new Date().toISOString()}));
 
