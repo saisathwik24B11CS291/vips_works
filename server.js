@@ -172,6 +172,7 @@ app.get('/api/config/google-client', (req,res)=>{
 // --- STATIC FILES ---
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
 app.use('/uploads', express.static(uploadDir)); 
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, 'public')));
