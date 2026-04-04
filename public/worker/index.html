@@ -1,0 +1,38 @@
+<div class="welcome-container">
+    <div class="header">
+        <div class="vip-badge">VIP</div>
+        <h1>Welcome to VIP Services</h1>
+        <p>Choose how you want to continue</p>
+    </div>
+
+    <div class="options">
+        <div class="card employer" onclick="selectRole('employer')">
+            <div class="icon-blue">💼</div>
+            <h3>I'm an Employer</h3>
+            <p>Looking for skilled workers for your projects.</p>
+            <button class="btn-blue">Continue as Employer</button>
+        </div>
+
+        <div class="card worker" onclick="selectRole('worker')">
+            <div class="icon-green">👥</div>
+            <h3>I'm a Worker</h3>
+            <p>Offering your professional services and skills.</p>
+            <button class="btn-green">Continue as Worker</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function selectRole(role) {
+        // 1. Save the role to localStorage so the signup page knows which type of user this is
+        localStorage.setItem('userRole', role);
+        
+        // 2. Redirect based on your folder structure
+        // If your HTML files are organized by folder, we point to the correct subfolder
+        if (role === 'employer') {
+            window.location.href = './employer/signup.html';
+        } else {
+            window.location.href = './worker/signup.html';
+        }
+    }
+</script>

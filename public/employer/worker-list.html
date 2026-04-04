@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Workers | VIPs</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #0d1117; color: white; font-family: sans-serif; margin: 0; padding: 15px; padding-bottom: 30px; }
+        
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .back-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+        .header-info h2 { margin: 0; font-size: 18px; }
+        .header-info p { margin: 0; color: #8b949e; font-size: 12px; }
+
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+        .filter-pill { 
+            background: #21262d; border: 1px solid #30363d; color: #8b949e;
+            padding: 8px 15px; border-radius: 20px; font-size: 12px; white-space: nowrap;
+        }
+        .filter-pill.active { background: #238636; color: white; border: none; }
+
+        .worker-card { 
+            background: #161b22; border: 1px solid #30363d; 
+            border-radius: 16px; padding: 15px; margin-bottom: 15px;
+        }
+        .worker-img { width: 80px; height: 80px; border-radius: 12px; object-fit: cover; border: 2px solid #0095f6; }
+        
+        .location-divider {
+            background: #1a1a1a; color: #0095f6; padding: 12px 15px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; margin: 25px 0 10px 0;
+            border-left: 4px solid #0095f6; border-radius: 4px;
+        }
+
+        .no-results { text-align: center; padding: 50px 20px; color: #555; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <button class="back-btn" onclick="window.location.href='home.html'">
+        <i class="fas fa-arrow-left"></i>
+    </button>
+    <div class="header-info">
+        <h2 id="job-title-display">Loading...</h2>
+        <p id="category-path">General Labour / Helper Jobs</p>
+    </div>
+</div>
+
+<span id="user-location-display" style="display: none;"></span>
+
+<div class="filter-bar">
+    <button class="filter-pill active">☆ Top Rated</button>
+    <button class="filter-pill">📈 Best Price</button>
+    <button class="filter-pill">🎓 Most Experienced</button>
+</div>
+
+<div id="worker-results-container">
+    <p style="text-align:center; color:#555;">Searching for workers...</p>
+</div>
+
+    <script>
+    const API_BASE = "http://localhost:5000";
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedJob = urlParams.get('job');
+    const selectedCategory = urlParams.get('category');
+    const token = localStorage.getItem('token');
+
+    // Live context
+    let employerCoords = null;           // { lat, lng } when geo is granted
+    let employerLocationText = "";       // Fallback string (Area, City (State))
+    let cachedWorkers = [];              // Keep last fetched list to allow live re-sorting
+    let locationWatchId = null;
+
+    // 1. Initialize Page
+    async function initPage() {
+        if (!token) return window.location.href = 'login.html';
+        
+        if (selectedJob) {
+            document.getElementById('job-title-display').innerText = selectedJob || "Available Workers";
+        }
+        // Grab employer profile (location string) and current coordinates in parallel
+        await Promise.all([loadHeader(), detectEmployerCoords()]);
+        await loadWorkers(selectedJob);
+        startLocationWatcher();
+    }
+
+    async function loadHeader() {
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/me`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            if (res.ok) {
+                const user = await res.json();
+                const locEl = document.getElementById('user-location-display');
+                employerLocationText = user.location || "";
+                if (locEl) locEl.innerText = employerLocationText;
+            }
+        } catch (e) { 
+            console.error("Header load failed", e); 
+        }
+    }
+
+    // Use browser geolocation to get precise lat/lng when possible
+    async function detectEmployerCoords() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    employerCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    resolve(employerCoords);
+                },
+                () => resolve(null),
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+            );
+        });
+    }
+
+    // Keep listening so the list re-sorts in real time if the employer moves
+    function startLocationWatcher(){
+        if (!navigator.geolocation) return;
+        locationWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                employerCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (cachedWorkers.length) renderWorkers(cachedWorkers);
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+        );
+    }
+
+    async function loadWorkers(jobType) {
+    try {
+        const res = await fetch(`${API_BASE}/api/workers/filter?job=${encodeURIComponent(jobType)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await res.json();
+
+        // Use Array.isArray to prevent "filter is not a function" crash
+        if (Array.isArray(data)) {
+            cachedWorkers = data;
+            renderWorkers(cachedWorkers);
+        } else {
+            // This will show you the real error message on the screen
+            document.getElementById('worker-results-container').innerHTML = 
+                `<p style="text-align:center; color:#8b949e;">${data.error || 'Check terminal for details'}</p>`;
+        }
+    } catch (err) {
+        console.error("Connection Error:", err);
+    }
+}
+function createWorkerCard(w) {
+    const statusColor = w.isBusy ? '#ff8c00' : '#00f076';
+    const statusText = w.isBusy ? 'Busy' : 'Available';
+    // Clean up the highlight term
+   const highlightTerm = selectedJob || "";
+
+// find category from worker categories
+let categoryName = "";
+
+if(w.categories){
+    const cat = w.categories.find(c => c.tags.includes(highlightTerm));
+    if(cat) categoryName = cat.name;
+}
+
+    return `
+        <div class="worker-card">
+            <div class="worker-header" style="display:flex; align-items:flex-start; margin-bottom:15px;">
+                <div class="profile-stack" style="position: relative;">
+                    <img src="${w.profilePicture ? API_BASE + w.profilePicture : 'https://via.placeholder.com/80?text=User'}" 
+                         class="worker-img" 
+                         onerror="this.src='https://via.placeholder.com/80?text=User';">
+                    <span class="status-tag" style="position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); font-size:10px; padding:2px 8px; border-radius:10px; background:${statusColor}; color:black; font-weight:bold;">
+                        ${statusText}
+                    </span>
+                </div>
+                
+                <div class="worker-main-info" style="flex:1; margin-left:15px;">
+                    <h4 style="margin:0; color:#0095f6; font-size:18px;">${w.username || 'Worker'} <i class="fas fa-check-circle" style="font-size:12px;"></i></h4>
+                    <p style="margin:4px 0; font-size:13px; color: white;">⭐ 4.9 <span style="color:#888;">(200+ reviews)</span></p>
+                    <div style="display:flex; gap:10px; font-size:12px; color:#8b949e; margin-top:8px;">
+                        <span><i class="fas fa-briefcase"></i> ${w.experience || '3+'} yrs</span>
+                        <span><i class="fas fa-map-marker-alt"></i> ${w.location || 'Location Not Shared'}</span>
+                    </div>
+                </div>
+
+                <div style="text-align:right;">
+                    <span style="display:block; color:#00f076; font-weight:bold; font-size:20px;">₹${w.hourlyRate || 0}</span>
+                    <span style="font-size:11px; color:#8b949e;">per hour</span>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+<button 
+onclick="window.location.href='view-worker.html?id=${w._id}&highlight=${encodeURIComponent(highlightTerm)}&category=${encodeURIComponent(categoryName)}'"
+style="flex:1; background:#0095f6; color:white; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; font-size:14px;">
+View Profile
+</button>
+
+${w.inviteSent 
+? `
+<button 
+onclick="cancelInvite('${w._id}', this)"
+style="background:#da3633;color:white;width:90px;border:none;border-radius:10px;cursor:pointer;">
+Cancel
+</button>
+`
+: `
+<button 
+onclick="sendInvite('${w._id}', this)"
+style="background:#21262d;border:1px solid #30363d;color:#00f076;width:50px;border-radius:10px;cursor:pointer;">
+<i class="fas fa-plus"></i>
+</button>
+`}
+</div>
+        </div>
+    `;
+}
+function renderWorkers(workers) {
+        const container = document.getElementById('worker-results-container');
+        const locEl = document.getElementById('user-location-display');
+        const employerLocFull = (locEl ? locEl.innerText : employerLocationText || "").trim();
+
+        // Text-based fallbacks (Area, City (State))
+        const locParts = employerLocFull.split(',');
+        const targetArea = locParts[0]?.trim() || "Local";
+        const targetCity = locParts[1]?.split('(')[0]?.trim() || "";
+        const targetState = (locParts[1]?.split('(')[1] || "").replace(')','').trim();
+
+        const buckets = {
+            zeroToFive: [],     // <=5 km or exact area
+            fiveToFifteen: [],  // <=15 km or strong city match
+            fifteenToFifty: [], // <=50 km or state-level match
+            others: []
+        };
+
+        workers.forEach((w)=>{
+            const workerCoords = extractWorkerCoords(w);
+            let placed = false;
+
+            if (employerCoords && workerCoords){
+                const dist = haversineDistance(employerCoords, workerCoords);
+                w._distanceKm = dist;
+                if (dist <= 5){ buckets.zeroToFive.push(w); placed = true; }
+                else if (dist <= 15){ buckets.fiveToFifteen.push(w); placed = true; }
+                else if (dist <= 50){ buckets.fifteenToFifty.push(w); placed = true; }
+            }
+
+            if (!placed){
+                const loc = (w.location || "").toLowerCase();
+                const textScore = computeTextScore(loc, targetArea, targetCity, targetState, employerLocFull.toLowerCase());
+                w._textScore = textScore;
+
+                // Map text score to buckets so nearby-state still surfaces before far results
+                if (textScore <= 0){ buckets.zeroToFive.push(w); placed=true; }
+                else if (textScore <= 1){ buckets.fiveToFifteen.push(w); placed=true; }
+                else if (textScore <= 2.5){ buckets.fifteenToFifty.push(w); placed=true; }
+            }
+            if (!placed) {
+                w._textScore = typeof w._textScore === "number" ? w._textScore : computeTextScore(loc, targetArea, targetCity, targetState, employerLocFull.toLowerCase());
+                buckets.others.push(w);
+            }
+        });
+
+        // Sort each bucket by numeric distance when available
+        const sortByDistance = (a,b) => {
+            const da = typeof a._distanceKm === "number" ? a._distanceKm : Number.POSITIVE_INFINITY;
+            const db = typeof b._distanceKm === "number" ? b._distanceKm : Number.POSITIVE_INFINITY;
+            return da - db;
+        };
+        Object.values(buckets).forEach(arr => arr.sort((a,b)=>{
+            const distOrder = sortByDistance(a,b);
+            if (distOrder !== 0) return distOrder;
+            const ta = typeof a._textScore === "number" ? a._textScore : Number.POSITIVE_INFINITY;
+            const tb = typeof b._textScore === "number" ? b._textScore : Number.POSITIVE_INFINITY;
+            if (ta !== tb) return ta - tb;
+            return (a.username || "").localeCompare(b.username || "");
+        }));
+
+        let html = "";
+        if (buckets.zeroToFive.length){
+            html += `<div class="location-divider">Near you (0-5 km)</div>`;
+            html += buckets.zeroToFive.map(w => createWorkerCard(w)).join('');
+        }
+        if (buckets.fiveToFifteen.length){
+            html += `<div class="location-divider">Expanding to 15 km radius</div>`;
+            html += buckets.fiveToFifteen.map(w => createWorkerCard(w)).join('');
+        }
+        if (buckets.fifteenToFifty.length){
+            html += `<div class="location-divider">Within 50 km</div>`;
+            html += buckets.fifteenToFifty.map(w => createWorkerCard(w)).join('');
+        }
+        if (buckets.others.length){
+            if (html !== "") html += `<div class="location-divider">Other Available Workers</div>`;
+            html += buckets.others.map(w => createWorkerCard(w)).join('');
+        }
+
+        container.innerHTML = html || "<div class='no-results'>No workers found for this job.</div>";
+    }
+
+    // --- Geo helpers ---
+    function extractWorkerCoords(w){
+        // Prefer explicit coords property if backend starts sending it
+        if (w.coordinates && typeof w.coordinates.lat === "number" && typeof w.coordinates.lng === "number"){
+            return { lat: w.coordinates.lat, lng: w.coordinates.lng };
+        }
+        // Parse "lat,lng" from location string if present
+        return parseCoordsFromLocation(w.location);
+    }
+
+    function parseCoordsFromLocation(locText){
+        if (!locText) return null;
+        const match = /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/.exec(locText);
+        if (!match) return null;
+        return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    }
+
+    function haversineDistance(a, b){
+        const toRad = (x)=> x * Math.PI / 180;
+        const R = 6371; // km
+        const dLat = toRad(b.lat - a.lat);
+        const dLng = toRad(b.lng - a.lng);
+        const lat1 = toRad(a.lat);
+        const lat2 = toRad(b.lat);
+        const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    // Text-based proximity scorer when we don't have coordinates
+    function computeTextScore(workerLoc, targetArea, targetCity, targetState, employerLocFull){
+        if(!workerLoc) return 999;
+        const loc = workerLoc.toLowerCase();
+        const area = (targetArea || "").toLowerCase();
+        const city = (targetCity || "").toLowerCase();
+        const state = (targetState || "").toLowerCase();
+        if(area && loc.includes(area)) return 0;
+        if(city && loc.includes(city)) return 1;
+        if(state && loc.includes(state)) return 2;
+
+        // Token overlap fallback (helps with nearby villages/districts)
+        const wTokens = loc.split(/[,\s]+/).filter(Boolean);
+        const eTokens = employerLocFull.split(/[,\s]+/).filter(Boolean);
+        const overlap = wTokens.filter(t => eTokens.includes(t)).length;
+        if(overlap > 0) return 3 - Math.min(overlap,3)*0.25; // small reward per match
+        return 10;
+    }
+   async function sendInvite(workerId, btn){
+
+const token = localStorage.getItem("token");
+const locationText = localStorage.getItem("userLocation") || "Not specified";
+
+try{
+
+btn.disabled = true;
+btn.innerHTML = "⏳";
+
+const res = await fetch(`http://localhost:5000/api/jobs/invite/${workerId}`,{
+method:"POST",
+headers:{
+"Content-Type":"application/json",
+"Authorization":"Bearer "+token
+},
+body:JSON.stringify({
+jobTitle: selectedJob || "Job Opportunity",
+message: "You have been invited for this job",
+jobLocation: locationText
+})
+});
+
+await res.json();
+
+btn.disabled = false;
+btn.innerHTML = "Cancel";
+btn.style.background = "#da3633";
+btn.style.color = "white";
+
+btn.onclick = function(){
+cancelInvite(workerId, btn);
+};
+
+}catch(err){
+
+console.error(err);
+
+btn.disabled = false;
+btn.innerHTML = '<i class="fas fa-plus"></i>';
+
+alert("Invite failed");
+
+}
+
+}
+
+async function cancelInvite(workerId, btn){
+
+const token = localStorage.getItem("token");
+
+try{
+
+btn.disabled = true;
+btn.innerHTML = "⏳";
+
+const res = await fetch(`http://localhost:5000/api/jobs/invite/${workerId}`,{
+method:"DELETE",
+headers:{
+"Content-Type":"application/json",
+"Authorization":"Bearer "+token
+},
+body:JSON.stringify({
+jobTitle:selectedJob
+})
+});
+
+await res.json();
+
+btn.disabled = false;
+btn.innerHTML = '<i class="fas fa-plus"></i>';
+btn.style.background = "#21262d";
+btn.style.color = "#00f076";
+
+btn.onclick = function(){
+sendInvite(workerId, btn);
+};
+
+}catch(err){
+
+console.error(err);
+
+btn.disabled = false;
+btn.innerHTML = "Cancel";
+
+alert("Cancel failed");
+
+}
+
+
+}
+    // Run initialization
+    initPage();
+    </script>
+</body>
+</html>

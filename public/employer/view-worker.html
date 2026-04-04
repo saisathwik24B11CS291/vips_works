@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker Profile | VIPs</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<style>
+:root{--bg-dark:#000;--card-bg:#121212;--accent-green:#00f076;--border:#262626}
+
+body{
+background:var(--bg-dark);
+color:white;
+font-family:sans-serif;
+margin:0;
+padding:20px
+}
+
+.header{
+display:flex;
+align-items:center;
+margin-bottom:20px
+}
+
+.back-btn{
+background:#262626;
+border:none;
+color:white;
+padding:8px 15px;
+border-radius:8px;
+cursor:pointer
+}
+
+.profile-card{
+background:var(--card-bg);
+border-radius:20px;
+padding:20px;
+border:1px solid var(--border)
+}
+
+.profile-header{
+display:flex;
+align-items:center;
+gap:15px;
+margin-bottom:20px
+}
+
+.avatar{
+width:80px;
+height:80px;
+background:var(--accent-green);
+border-radius:15px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:30px;
+font-weight:bold
+}
+
+.badge-verified{
+background:var(--accent-green);
+color:black;
+padding:2px 8px;
+border-radius:10px;
+font-size:10px;
+font-weight:bold;
+width:fit-content;
+margin-bottom:10px
+}
+
+.info-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:20px
+}
+
+.info-item{
+background:#1a1a1a;
+padding:15px;
+border-radius:12px;
+border:1px solid var(--border)
+}
+
+.info-label{
+color:#888;
+font-size:12px;
+margin-bottom:5px;
+display:flex;
+align-items:center;
+gap:8px
+}
+
+.info-value{
+font-size:14px;
+font-weight:500
+}
+
+.skills-container{
+margin-top:20px;
+background:#1a1a1a;
+padding:15px;
+border-radius:12px
+}
+
+.skill-tag{
+background:#003311;
+color:var(--accent-green);
+padding:5px 12px;
+border-radius:15px;
+font-size:12px;
+display:inline-block;
+margin:4px;
+border:1px solid #004411
+}
+
+.skill-tag.highlighted{
+background:var(--accent-green)!important;
+color:black!important;
+border:2px solid white;
+font-weight:bold;
+transform:scale(1.1)
+}
+
+.chat-btn{
+width:100%;
+padding:15px;
+background:#0095f6;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+margin-top:20px;
+cursor:pointer
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+<button class="back-btn" onclick="history.back()">
+<i class="fas fa-arrow-left"></i> Back
+</button>
+</div>
+
+<div id="profile-content"></div>
+
+<script>
+
+const API_BASE="http://localhost:5000";
+
+async function loadWorkerProfile(){
+
+const urlParams=new URLSearchParams(window.location.search);
+const workerId=urlParams.get("id");
+const highlight=urlParams.get("highlight") || "";
+const selectedCategory=urlParams.get("category") || "";
+
+if(!workerId) return;
+
+try{
+
+const response=await fetch(`${API_BASE}/api/users/profile/${workerId}`,{
+headers:{Authorization:`Bearer ${localStorage.getItem("token")}`}
+});
+
+const data=await response.json();
+console.log("DEBUG - Received Object:",data);
+
+const worker=data.user || data;
+console.log("Worker categories:", worker.categories);
+
+/* LOCATION */
+let displayLoc=
+worker.location ||
+worker.city ||
+worker.address ||
+"Location not shared";
+
+/* SKILLS */
+let skillList=[];
+let additionalSkills=[];
+
+const selectedSkill=(highlight || "").toLowerCase();
+const selectedCategoryLower=(selectedCategory || "").toLowerCase();
+
+if(worker.categories && Array.isArray(worker.categories)){
+
+    worker.categories.forEach(cat => {
+
+        const catLower = (cat.name || "").toLowerCase();
+
+        // Only process the selected category
+        if(selectedCategoryLower && catLower !== selectedCategoryLower){
+            return;
+        }
+
+        if(cat.tags){
+
+            cat.tags.forEach(tag => {
+
+                const tagLower = tag.toLowerCase();
+
+                if(tagLower === selectedSkill){
+                    skillList.push(tag);
+                } else {
+                    additionalSkills.push(tag);
+                }
+
+            });
+
+        }
+
+    });
+
+}
+
+skillList=[...new Set(skillList)];
+additionalSkills=[...new Set(additionalSkills)].filter(
+skill=>skill.toLowerCase()!==selectedSkill
+);
+
+/* PROFESSION */
+let professionText="Professional Worker";
+
+if(worker.profession){
+
+if(Array.isArray(worker.profession)){
+professionText=worker.profession.join(", ");
+}else{
+professionText=worker.profession;
+}
+
+}
+
+/* UI */
+
+document.getElementById("profile-content").innerHTML=`
+
+<div class="badge-verified">VIP VERIFIED WORKER</div>
+
+<div class="profile-card">
+
+<div class="profile-header">
+
+<div class="avatar">
+${worker.username ? worker.username[0].toUpperCase() : "W"}
+</div>
+
+<div>
+
+<h2 style="margin:0">
+${worker.username}
+<i class="fas fa-check-circle" style="color:var(--accent-green)"></i>
+</h2>
+
+<p style="color:#888;margin:5px 0">
+${professionText}
+</p>
+
+</div>
+</div>
+
+<div class="info-grid">
+
+<div class="info-item">
+<div class="info-label">
+<i class="fas fa-phone"></i> PHONE
+</div>
+<div class="info-value">
+<strong>${worker.phone || "Not shared"}</strong>
+</div>
+</div>
+
+<div class="info-item">
+<div class="info-label">
+<i class="fas fa-envelope"></i> EMAIL
+</div>
+<div class="info-value">
+<strong>${worker.email || "Private"}</strong>
+</div>
+</div>
+
+<div class="info-item" style="grid-column:span 2">
+<div class="info-label">
+<i class="fas fa-map-marker-alt" style="color:#ff3b30"></i>
+CURRENT LOCATION
+</div>
+<div class="info-value">
+<strong>${displayLoc}</strong>
+</div>
+</div>
+
+</div>
+
+<div class="skills-container">
+
+<div class="info-label">EXPERTISE & SKILLS</div>
+
+<div style="margin-top:10px">
+
+<span class="skill-tag highlighted">
+${highlight || professionText || "General"}
+</span>
+
+${skillList.map(skill=>{
+if(highlight && skill.toLowerCase()===highlight.toLowerCase()) return "";
+return `<span class="skill-tag">${skill}</span>`;
+}).join("")}
+
+</div>
+
+</div>
+
+${additionalSkills.length>0?`
+
+<div class="skills-container">
+
+<div class="info-label">ADDITIONAL SKILLS</div>
+
+<div style="margin-top:10px">
+
+${additionalSkills.map(skill=>
+`<span class="skill-tag">${skill}</span>`
+).join("")}
+
+</div>
+
+</div>
+
+`:""}
+
+<button class="chat-btn"
+onclick="window.location.href='chat.html?id=${worker._id}'">
+
+<i class="far fa-comments"></i>
+Message ${worker.username}
+
+</button>
+
+</div>
+`;
+
+}catch(err){
+
+console.error("Fetch Error:",err);
+
+}
+
+}
+
+window.onload=loadWorkerProfile;
+
+</script>
+
+</body>
+</html>

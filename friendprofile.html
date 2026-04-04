@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile View</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --card-bg: #121212;
+            --accent-blue: #3b82f6; 
+            --text-gray: #94a3b8;
+            --border-color: #262626;
+            --success: #22c55e;
+            --lock-gold: #fbbf24;
+            --glass: rgba(255, 255, 255, 0.03);
+        }
+
+        body { 
+            margin: 0; font-family: 'Inter', -apple-system, sans-serif; 
+            background-color: var(--bg-dark); color: white; line-height: 1.5;
+        }
+
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+
+        .top-nav { 
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; margin-bottom: 20px; position: sticky; top: 0; background: var(--bg-dark); z-index: 10;
+        }
+        .back-btn { 
+            background: var(--card-bg); border: 1px solid var(--border-color); 
+            color: white; padding: 10px 18px; border-radius: 12px; cursor: pointer; transition: 0.2s;
+        }
+
+        .profile-card {
+            background: linear-gradient(180deg, var(--glass) 0%, rgba(0,0,0,0) 100%);
+            border-radius: 28px; padding: 30px 20px; border: 1px solid var(--border-color);
+            text-align: center; margin-bottom: 25px; position: relative; overflow: hidden;
+        }
+        .profile-photo {
+            width: 110px; height: 110px; border-radius: 35px;
+            margin: 0 auto 15px; border: 3px solid var(--bg-dark);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            object-fit: cover; background: #222;
+        }
+        .verified-badge { color: var(--accent-blue); font-size: 14px; margin-left: 4px; }
+        
+        .role-pill {
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            background: rgba(255,255,255,0.05); color: var(--text-gray);
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            margin-top: 8px; border: 1px solid var(--border-color);
+        }
+
+        .btn-group { display: flex; gap: 12px; margin-top: 25px; padding: 0 10px; }
+        .btn-main { 
+            flex: 1; padding: 14px; border-radius: 16px; font-weight: 600; 
+            border: none; cursor: pointer; transition: 0.3s; font-size: 15px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-follow { background: var(--accent-blue); color: white; }
+        .btn-message { background: white; color: black; }
+        .btn-locked { background: #1a1a1a; color: var(--text-gray); border: 1px solid var(--border-color); cursor: default; }
+
+        .section-title { 
+            font-size: 13px; color: var(--text-gray); text-transform: uppercase; 
+            letter-spacing: 1px; margin: 25px 0 12px 10px; font-weight: 700;
+        }
+        .info-box { 
+            background: var(--card-bg); border-radius: 20px; 
+            border: 1px solid var(--border-color); overflow: hidden;
+            padding: 16px; margin-bottom: 10px;
+        }
+        .info-row { 
+            display: flex; align-items: center; gap: 15px;
+            padding: 10px 0; border-bottom: 1px solid var(--border-color); 
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-row i { color: var(--accent-blue); width: 20px; text-align: center; }
+
+        .private-msg {
+            background: var(--card-bg); padding: 50px 30px; border-radius: 24px;
+            text-align: center; border: 1px solid var(--border-color);
+        }
+        .private-msg i.fa-lock { font-size: 40px; color: var(--lock-gold); margin-bottom: 15px; }
+        /* These match the search page styles we created */
+.follow-btn.following {
+    background: #262626 !important;
+    color: #efefef !important;
+    border: 1px solid #333 !important;
+}
+
+.follow-btn.requested {
+    background: transparent !important;
+    border: 1px solid #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+    </style>
+</head>
+<body>
+    
+
+<div class="container">
+    <div class="top-nav">
+        <button class="back-btn" onclick="history.back()"><i class="fas fa-chevron-left"></i></button>
+        <span id="nav-username">Profile</span>
+        <div style="width: 42px;"></div>
+    </div>
+
+    <div class="profile-card">
+    <img id="profile-img" src="https://via.placeholder.com/110" class="profile-photo">
+    <h2 id="display-name">Loading...</h2>
+    <div id="display-role" class="role-pill">...</div>
+    
+    <div id="action-buttons" class="btn-group" style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;"></div>
+</div>
+
+    <div id="profile-content"></div>
+</div>
+
+<script>
+    // --- 1. CONFIGURATION & GLOBALS ---
+    const API_BASE = "http://127.0.0.1:5000";
+    // We get these globally, but we also re-check them inside functions for safety
+    let token = localStorage.getItem('token');
+    let myId = localStorage.getItem('userId');
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewedUserId = urlParams.get('id');
+
+    async function loadFriendProfile() {
+        if (!viewedUserId) return;
+
+        // Refresh local storage values
+        myId = localStorage.getItem('userId');
+        token = localStorage.getItem('token');
+        
+        const isOwner = viewedUserId === myId;
+        
+        console.log("My ID from storage:", myId);
+        console.log("Viewed User ID:", viewedUserId);
+        
+        if (!myId) {
+            console.warn("User ID not found in localStorage. Comparisons may fail.");
+        }
+
+        const contentDiv = document.getElementById('profile-content');
+        const btnDiv = document.getElementById('action-buttons');
+        const nameHeading = document.getElementById('display-name');
+
+        try {
+            const res = await fetch(`${API_BASE}/api/users/profile/${viewedUserId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const user = await res.json();
+
+            if (!user || user.message) {
+                nameHeading.innerText = "User not found";
+                return;
+            }
+
+            // --- 2. CALCULATE PRIVACY & STATUS ---
+            const currentUserIdStr = myId ? myId.toString() : null;
+            // Using the flags we added to the backend for accuracy
+            const hasRequested = user.hasRequested || user.followRequests?.some(id => id.toString() === currentUserIdStr);
+            const isFollowing = user.isFollowing || user.followers?.some(id => id.toString() === currentUserIdStr); 
+            const isEmployer = user.role === 'employer';
+            
+            const isPrivateAccount = (user.followToView === true || user.settings?.followToView === true);
+            
+            // A profile is locked if it's a private employer account and you aren't following yet
+            const isLocked = isEmployer && isPrivateAccount && !isFollowing && !isOwner;
+
+            // --- 3. UPDATE HEADER UI ---
+            document.getElementById('nav-username').innerText = `@${user.username}`;
+            document.getElementById('display-role').innerText = user.role?.toUpperCase() || 'USER';
+            
+            if (user.profilePicture) {
+                document.getElementById('profile-img').src = user.profilePicture.startsWith('http') 
+                    ? user.profilePicture 
+                    : API_BASE + user.profilePicture;
+            }
+
+            let nameHTML = user.companyName || user.username;
+            nameHeading.innerHTML = nameHTML + (isLocked 
+                ? ` <i class="fas fa-lock" style="color: #fbbf24; margin-left: 8px;"></i>` 
+                : ` <i class="fas fa-check-circle verified-badge" style="color: #3b82f6; margin-left: 8px;"></i>`);
+
+            // --- 4. RENDER BUTTONS & CONTENT ---
+            let buttonsHtml = '';
+
+            // If it's my own profile, don't show follow/cancel buttons
+            if (isOwner) {
+                buttonsHtml = `<button class="btn-main" style="width: 100%; background: #262626;" onclick="window.location.href='settings.html'">Edit Profile</button>`;
+            } else if (isLocked) {
+                // --- RENDER LOCKED VIEW BUTTONS ---
+                if (hasRequested) {
+                    buttonsHtml = `
+                        <button class="btn-main requested" style="flex: 2; background:transparent; border:1px solid #3b82f6; color:#3b82f6;" disabled>
+                            <i class="fas fa-clock"></i> Requested
+                        </button>
+                        <button class="btn-main" style="flex: 1; background: #1a1a1a; color: #ff4d4d; border: 1px solid #444;" onclick="handleFollow('${user._id}')">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>`;
+                } else {
+                    buttonsHtml = `
+                        <button class="btn-main btn-follow" style="width: 100%;" onclick="handleFollow('${user._id}')">
+                            Follow to View & Message
+                        </button>`;
+                }
+                
+                contentDiv.innerHTML = `
+                    <div class="private-msg" style="text-align: center; padding: 40px 20px;">
+                        <i class="fas fa-lock" style="font-size: 40px; color: #fbbf24; margin-bottom: 15px;"></i>
+                        <h3>Business Profile Private</h3>
+                        <p style="color: #94a3b8; font-size: 14px;">Follow this employer to see their contact info and send messages.</p>
+                    </div>`;
+
+            } else {
+                // --- RENDER UNLOCKED VIEW BUTTONS ---
+                if (isFollowing) {
+                    buttonsHtml = `
+                        <button class="btn-main following" style="background:#262626; color:white; flex: 1;" onclick="handleFollow('${user._id}')">
+                            <i class="fas fa-user-check"></i> Following
+                        </button>
+                        <button class="btn-main btn-message" style="background:white; color:black; flex: 1;" onclick="window.location.href='chat.html?id=${user._id}'">
+                            <i class="fas fa-paper-plane"></i> Message
+                        </button>`;
+                } else if (hasRequested) {
+                    buttonsHtml = `
+                        <button class="btn-main requested" style="flex: 2; background:transparent; border:1px solid #3b82f6; color:#3b82f6;" disabled>
+                            <i class="fas fa-clock"></i> Requested
+                        </button>
+                        <button class="btn-main" style="flex: 1; background: #1a1a1a; color: #ff4d4d; border: 1px solid #444;" onclick="handleFollow('${user._id}')">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>`;
+                } else {
+                    buttonsHtml = `
+                        <button class="btn-main btn-follow" style="width: 100%;" onclick="handleFollow('${user._id}')">
+                            Follow
+                        </button>`;
+                }
+
+                contentDiv.innerHTML = `
+                    <div class="section-title">About</div>
+                    <div class="info-box" style="background: #121212; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                        ${user.bio || 'No bio provided.'}
+                    </div>
+                    <div class="section-title">Contact Information</div>
+                    <div class="info-box" style="background: #121212; padding: 15px; border-radius: 12px;">
+                        <p style="margin-bottom: 10px;"><i class="fas fa-envelope" style="color: #3b82f6; margin-right: 10px;"></i> ${user.email}</p>
+                        ${user.phone ? `<p><i class="fas fa-phone" style="color: #10b981; margin-right: 10px;"></i> ${user.phone}</p>` : ''}
+                    </div>`;
+            }
+
+            // Set the final buttons to the div
+            btnDiv.innerHTML = `<div style="display: flex; gap: 10px; width: 100%;">${buttonsHtml}</div>`;
+
+        } catch (err) {
+            console.error("Load failed", err);
+            nameHeading.innerText = "Error Loading Profile";
+        }
+    }
+
+    // Unified function for Follow, Unfollow, and Cancel
+    async function handleFollow(id) {
+        const activeToken = localStorage.getItem('token');
+        if (!activeToken) return alert("Please login to perform this action.");
+        
+        console.log("Processing action for user:", id);
+        
+        try {
+            const res = await fetch(`${API_BASE}/api/users/follow/${id}`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${activeToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (res.ok) {
+                // Success! Refresh the page to show new state
+                location.reload(); 
+            } else {
+                const data = await res.json().catch(() => ({})); 
+                alert(data.message || "Action failed");
+            }
+        } catch (err) {
+            console.error("Follow error:", err);
+            alert("Network error. Check if your server is running.");
+        }
+    }
+
+    // Initialize page
+    loadFriendProfile();
+</script>
+</body>
+</html>

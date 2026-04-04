@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #000; color: white; margin: 0; padding-bottom: 70px; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; position: sticky; top: 0; background: #000; z-index: 100; }
+        .header h2 { font-size: 22px; margin: 0; }
+        .search-container { padding: 0 15px 15px 15px; }
+        .search-wrapper { background: #262626; border-radius: 10px; padding: 10px 15px; display: flex; align-items: center; gap: 10px; }
+        #search-input { background: transparent; border: none; color: white; width: 100%; outline: none; font-size: 16px; }
+        .tabs { display: flex; justify-content: space-between; padding: 10px 20px; border-bottom: 0.5px solid #262626; margin-bottom: 10px; }
+        .tab-active { font-weight: 700; border-bottom: 1px solid white; padding-bottom: 5px; }
+        .tab-link { color: #3b82f6; font-weight: 600; text-decoration: none; position: relative; }
+        #inbox-container { display: flex; flex-direction: column; }
+        .chat-item { display: flex; align-items: center; padding: 12px 20px; cursor: pointer; transition: background 0.2s; }
+        .chat-item:hover { background: #121212; }
+        .avatar-wrapper { position: relative; margin-right: 15px; flex-shrink: 0; }
+        .avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: #262626; }
+        .info-text { flex: 1; min-width: 0; }
+        .info-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+        .info-header b { font-size: 15px; }
+        .last-msg { font-size: 13px; color: #8e8e8e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+        .badge { display: none; background-color: #ff3b30; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: #000; border-top: 1px solid #262626; display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
+        .nav-item { color: #737373; text-decoration: none; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; position: relative; }
+        .nav-item.active { color: #ffffff; }
+        .nav-item svg { width: 26px; height: 26px; stroke-width: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Messages</h2>
+    <div style="font-size: 20px;">📝</div>
+</div>
+
+<div class="search-container">
+    <div class="search-wrapper">
+        <span>🔍</span>
+        <input type="text" id="search-input" placeholder="Search your following..." oninput="toggleSearch()">
+    </div>
+</div>
+
+<div class="tabs">
+    <span class="tab-active">Messages</span>
+    <a href="follow-requests.html" class="tab-link">
+        Requests
+        <span id="request-badge" class="badge"></span>
+    </a>
+</div>
+
+<div id="inbox-container"></div>
+
+<div class="bottom-nav">
+    <a href="home.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    </a>
+    <a href="../search.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    </a>
+    <a href="messages.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><line x1="22" y1="2" x2="11" y2="13" stroke="white" stroke-width="2"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        <span id="nav-msg-badge" class="badge"></span>
+    </a>
+    <a href="profile.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    </a>
+</div>
+
+<script>
+    const API_BASE = "http://127.0.0.1:5000";
+    const token = localStorage.getItem('token');
+    const inboxContainer = document.getElementById('inbox-container');
+    let myFollowing = new Set();
+    let myFollowers = new Set();
+    let myId = "";
+
+    // 1. Sync Badges and Notifications
+    async function checkNotifications() {
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/users/requests`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const requests = res.ok ? await res.json() : [];
+            
+            const reqBadge = document.getElementById('request-badge');
+            const navMsgBadge = document.getElementById('nav-msg-badge');
+
+            if (requests && requests.length > 0) {
+                reqBadge.style.display = 'inline-block';
+                reqBadge.innerText = requests.length;
+                navMsgBadge.style.display = 'inline-block';
+                navMsgBadge.innerText = requests.length;
+            } else {
+                reqBadge.style.display = 'none';
+                navMsgBadge.style.display = 'none';
+            }
+        } catch (err) { console.log("Badge check failed"); }
+    }
+
+    // 2. Load Inbox Conversations
+    async function loadInbox() {
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/messages/conversations`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const conversations = await res.json();
+
+            if (!conversations || conversations.length === 0) {
+                inboxContainer.innerHTML = `<p style="text-align:center; color:gray; margin-top:50px;">No messages yet.</p>`;
+                return;
+            }
+
+            inboxContainer.innerHTML = conversations.map(c => {
+                const time = new Date(c.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `
+                <div class="chat-item" onclick="window.location.href='../chat.html?id=${c.partner._id}'">
+                    <div class="avatar-wrapper">
+                        <img class="avatar" src="${c.partner.profilePicture ? API_BASE + c.partner.profilePicture : 'https://via.placeholder.com/56'}" alt="Avatar">
+                    </div>
+                    <div class="info-text">
+                        <div class="info-header">
+                            <b>${c.partner.username}</b>
+                            <span style="font-size:12px; color:#8e8e8e;">${time}</span>
+                        </div>
+                        <p class="last-msg">${c.lastMessage}</p>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (err) { 
+            inboxContainer.innerHTML = `<p style="text-align:center; color:red;">Failed to load inbox</p>`;
+        }
+    }
+
+    // 3. Search Logic - MODIFIED to block Employer-to-Employer visibility
+    async function searchUsers(query) {
+        try {
+            const res = await fetch(`${API_BASE}/api/users/search?q=${query}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const allUsers = await res.json();
+            const filteredUsers = allUsers.filter(user => {
+                if (user.role !== 'worker') return false;
+                const idStr = String(user._id);
+                return myFollowers.has(idStr) || myFollowing.has(idStr);
+            });
+            
+            if (!filteredUsers || filteredUsers.length === 0) {
+                inboxContainer.innerHTML = `<p style="text-align:center; color:gray; margin-top:20px;">No matches in your following.</p>`;
+                return;
+            }
+
+            inboxContainer.innerHTML = filteredUsers.map(user => `
+                <div class="chat-item" onclick="window.location.href='../chat.html?id=${user._id}'">
+                    <div class="avatar-wrapper">
+                        <img class="avatar" src="${user.profilePicture ? API_BASE + user.profilePicture : 'https://via.placeholder.com/56'}" alt="Avatar">
+                    </div>
+                    <div class="info-text">
+                        <b>${user.username}</b>
+                        <p class="last-msg">${user.role} • Tap to message</p>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) { console.error("Search failed", err); }
+    }
+
+    function toggleSearch() {
+        const query = document.getElementById('search-input').value.trim();
+        query.length > 0 ? searchUsers(query) : loadInbox();
+    }
+
+    async function loadMe(){
+        try{
+            const res = await fetch(`${API_BASE}/api/auth/me`,{headers:{'Authorization':`Bearer ${token}`}});
+            if(res.ok){
+                const me = await res.json();
+                myId = me._id;
+                myFollowing = new Set((me.following||[]).map(String));
+                myFollowers = new Set((me.followers||[]).map(String));
+            }
+        }catch(e){}
+    }
+
+    // Initialize
+    if (token) {
+        loadMe().finally(()=>{ loadInbox(); });
+        checkNotifications();
+    } else {
+        window.location.href = '../login.html';
+    }
+</script>
+</body>
+</html>

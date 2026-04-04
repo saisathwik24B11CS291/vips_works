@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPs | Employer Settings</title>
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --card-bg: #121212;
+            --accent-blue: #3b82f6; 
+            --text-gray: #94a3b8;
+            --border-color: #262626;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body { 
+            margin: 0; font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-dark); color: white; 
+        }
+
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+
+        /* --- HEADER --- */
+        .settings-header { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .back-btn {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            color: white; padding: 8px 15px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; font-size: 14px; transition: 0.3s;
+        }
+        .back-btn:hover { background: #1a1a1a; }
+
+        /* --- SETTINGS GROUPS --- */
+        .settings-group {
+            background: var(--card-bg); border-radius: 16px;
+            border: 1px solid var(--border-color); overflow: hidden;
+            margin-bottom: 25px;
+        }
+        .group-title {
+            font-size: 11px; color: var(--text-gray); text-transform: uppercase;
+            letter-spacing: 1px; margin-left: 10px; margin-bottom: 8px;
+        }
+
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; transition: 0.2s;
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-row:hover { background: #1a1a1a; }
+
+        .row-left { display: flex; align-items: center; gap: 15px; }
+        .icon-box {
+            width: 32px; height: 32px; background: rgba(255,255,255,0.05);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+
+        .row-label { font-size: 14px; font-weight: 500; }
+        .row-info { font-size: 12px; color: var(--text-gray); display: block; margin-top: 2px; }
+
+        /* --- TOGGLE SWITCH --- */
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333; transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px;
+            left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(18px); }
+
+        #toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--accent-blue); color: white; padding: 10px 20px;
+            border-radius: 20px; font-size: 14px; display: none; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="settings-header">
+            <a href="profile.html" class="back-btn">← Back</a>
+            <h2 style="margin:0;">Settings</h2>
+        </div>
+
+        <div class="group-title">Privacy & Connections</div>
+        <div class="settings-group">
+            <div class="settings-row">
+                <div class="row-left">
+                    <div class="icon-box">🔒</div>
+                    <div>
+                        <span class="row-label">Follow to View Details</span>
+                        <span class="row-info">Workers must follow you to see Phone & Email</span>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="follow-privacy-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <div class="row-left">
+                    <div class="icon-box">🤝</div>
+                    <div>
+                        <span class="row-label">Auto-Accept Follow Requests</span>
+                        <span class="row-info">Instantly accept worker follow requests</span>
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="auto-accept-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="group-title">Preferences</div>
+        <div class="settings-group">
+            <div class="settings-row">
+                <div class="row-left">
+                    <div class="icon-box">🔔</div>
+                    <span class="row-label">Push Notifications</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="notifications-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="group-title">Danger Zone</div>
+        <div class="settings-group">
+            <div class="settings-row" onclick="confirmDelete()">
+                <div class="row-left">
+                    <div class="icon-box" style="color:var(--danger)">⚠️</div>
+                    <span class="row-label" style="color:var(--danger)">Delete Account</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast">Settings updated</div>
+
+    <script>
+        const API_BASE = "http://localhost:5000";
+        const token = localStorage.getItem('token');
+        
+        const privacyToggle = document.getElementById('follow-privacy-toggle');
+        const autoAcceptToggle = document.getElementById('auto-accept-toggle');
+        const notificationToggle = document.getElementById('notifications-toggle');
+        const toast = document.getElementById('toast');
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2000);
+        }
+
+        // --- SAVE FUNCTION ---
+        // We use a single endpoint to update privacy settings
+        async function updateSetting(payload) {
+            if (!token) return;
+            try {
+                const response = await fetch(`${API_BASE}/api/employer/update-privacy`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    showToast("Settings updated successfully");
+                } else {
+                    showToast("Error saving settings");
+                }
+            } catch (err) {
+                console.error("Update error:", err);
+                showToast("Server connection failed");
+            }
+        }
+
+        // Event Listeners
+        privacyToggle.addEventListener('change', () => {
+            updateSetting({ followToView: privacyToggle.checked });
+        });
+
+        autoAcceptToggle.addEventListener('change', () => {
+            updateSetting({ autoAccept: autoAcceptToggle.checked });
+        });
+
+        notificationToggle.addEventListener('change', () => {
+            // Logic for push notifications can be added here
+            showToast("Notification preferences updated");
+        });
+
+        // --- LOAD FUNCTION ---
+        async function loadSettings() {
+    if (!token) {
+        window.location.href = 'login.html';
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const user = await response.json();
+        
+        if (response.ok) {
+            // FIX: Point to the nested 'settings' object from your schema
+            const settings = user.settings || {};
+            
+            privacyToggle.checked = settings.followToView !== false; 
+            autoAcceptToggle.checked = settings.autoAccept === true; 
+        }
+    } catch (err) {
+        console.error("Load failed:", err);
+    }
+}
+
+        function confirmDelete() {
+            if (confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) {
+                // Call delete API here
+                showToast("Account deletion requested");
+            }
+        }
+
+        // Initialize on page load
+        window.onload = loadSettings;
+    </script>
+</body>
+</html>

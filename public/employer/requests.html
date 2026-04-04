@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employer Activity</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root{
+            --bg:#000;
+            --card:#0f1117;
+            --border:#1f2937;
+            --text:#e5e7eb;
+            --muted:#9ca3af;
+            --accent:#3b82f6;
+            --success:#22c55e;
+        }
+        body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:20px;}
+        .header{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+        .back-btn{color:var(--text);text-decoration:none;font-size:22px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;}
+        h1{margin:0;font-size:20px;}
+        .pill-toggle{display:flex;gap:10px;margin-bottom:16px;}
+        .pill{flex:1;text-align:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:#0b1220;color:var(--muted);cursor:pointer;font-weight:700;}
+        .pill.active{background:var(--accent);color:white;border-color:#2563eb;}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;}
+        .avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#222;}
+        .title{margin:0;font-size:15px;}
+        .meta{color:var(--muted);font-size:12px;margin:2px 0;}
+        .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;border:1px solid #1f6f3b;background:#0b2e1a;color:#7ef2b9;margin-top:6px;}
+        .badge.rejected{background:#3a0f0f;color:#fca5a5;border-color:#7f1d1d;}
+        .badge.cancelled{background:#374151;color:#cbd5e1;border-color:#475569;}
+        .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
+        .btn{padding:9px 14px;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+        .btn.primary{background:var(--accent);color:white;}
+        .btn.ghost{background:#0b1220;color:var(--text);border:1px solid var(--border);}
+        .btn.danger{background:#3a0f0f;color:#fca5a5;border:1px solid #7f1d1d;}
+        .empty{color:var(--muted);text-align:center;margin-top:40px;}
+        section{display:none;}
+        section.active{display:block;}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="home.html" class="back-btn">&larr;</a>
+        <h1>Activity</h1>
+    </div>
+
+    <div class="pill-toggle">
+        <div id="tab-invited" class="pill active" onclick="showTab('invited')">User Invited</div>
+        <div id="tab-requests" class="pill" onclick="showTab('requests')">Job Requests</div>
+    </div>
+
+    <section id="invited-section" class="active">
+        <div id="invited-list"><p class="empty">Loading accepted invites...</p></div>
+    </section>
+
+    <section id="requests-section">
+        <div id="job-requests-list"><p class="empty">Loading job requests...</p></div>
+    </section>
+
+    <script>
+        const API_BASE = "http://localhost:5000";
+        const token = localStorage.getItem('token');
+
+        function showTab(which){
+            document.getElementById('tab-invited').classList.toggle('active', which==='invited');
+            document.getElementById('tab-requests').classList.toggle('active', which==='requests');
+            document.getElementById('invited-section').classList.toggle('active', which==='invited');
+            document.getElementById('requests-section').classList.toggle('active', which==='requests');
+        }
+
+        const avatarSrc = (user)=> user?.profilePicture ? `${API_BASE}${user.profilePicture}` : 'https://via.placeholder.com/48';
+        const safeLocation = (worker, inviteLoc, snapLoc) => {
+            const loc = worker?.location && worker.location.trim();
+            if(loc) return loc;
+            if(inviteLoc && inviteLoc.trim().toLowerCase() !== "not specified") return inviteLoc;
+            if(snapLoc && snapLoc.trim().toLowerCase() !== "not specified") return snapLoc;
+            return "Location not set";
+        };
+
+        function renderInvited(data){
+            const wrap = document.getElementById('invited-list');
+            if(!data || !data.length){
+                wrap.innerHTML = '<p class="empty">No accepted invites yet.</p>';
+                return;
+            }
+            wrap.innerHTML = data.map(inv=>`
+                <div class="card">
+                    <img class="avatar" src="${avatarSrc(inv.workerId)}" alt="">
+                    <div>
+                        <p class="title"><a href="view-worker.html?id=${inv.workerId?._id || ''}" style="color:inherit;text-decoration:none;">${inv.workerId?.username || 'Worker'}</a></p>
+                        <p class="meta"><i class="fas fa-briefcase"></i> ${inv.jobTitle}</p>
+                        <p class="meta"><i class="fas fa-location-dot"></i> ${safeLocation(inv.workerId, inv.jobLocation, inv.workerLocationAtInvite)}</p>
+                        <div class="actions">
+                            <button class="btn primary" onclick="openChat('${inv.workerId?._id || ''}', true)"><i class="fas fa-message"></i> Message</button>
+                            <button class="btn danger" onclick="rejectInvite('${inv._id}')"><i class="fas fa-xmark"></i> Reject</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderJobRequests(data){
+            const wrap = document.getElementById('job-requests-list');
+            if(!data || !data.length){
+                wrap.innerHTML = '<p class="empty">No job requests yet.</p>';
+                return;
+            }
+            wrap.innerHTML = data.map(req=>`
+                <div class="card">
+                    <img class="avatar" src="${avatarSrc(req.workerId)}" alt="">
+                    <div>
+                        <p class="title"><a href="view-worker.html?id=${req.workerId?._id || ''}" style="color:inherit;text-decoration:none;">${req.workerId?.username || 'Worker'}</a></p>
+                        <p class="meta"><i class="fas fa-briefcase"></i> ${req.jobId?.title || 'Job title not set'} ${statusPill(req.status)}</p>
+                        <p class="meta"><i class="fas fa-location-dot"></i> ${safeLocation(req.workerId, req.jobId?.location, '')}</p>
+                        <p class="meta"><i class="fas fa-phone"></i> ${req.workerId?.phone || 'No phone'} | <i class="fas fa-envelope"></i> ${req.workerId?.email || 'No email'}</p>
+                        ${renderJobRequestActions(req)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function statusPill(status){
+            const st = status || 'applied';
+            if(st === 'accepted') return `<span class="badge">Accepted</span>`;
+            if(st === 'rejected') return `<span class="badge rejected">Rejected</span>`;
+            if(st === 'withdrawn') return `<span class="badge cancelled">Cancelled by worker</span>`;
+            return '';
+        }
+
+        function renderJobRequestActions(req){
+            const status = req.status || 'applied';
+            if(status === 'accepted'){
+                return `<div class="actions">
+                    <button class="btn primary" style="opacity:0.8;cursor:default;">Accepted</button>
+                    <button class="btn ghost" onclick="cancelJobRequest('${req._id}')">Cancel</button>
+                </div>`;
+            }
+            if(status === 'rejected'){
+                return `<div class="actions">
+                    <button class="btn danger" style="opacity:0.8;cursor:default;">Rejected</button>
+                    <button class="btn ghost" onclick="deleteJobRequest('${req._id}')">Delete</button>
+                </div>`;
+            }
+            if(status === 'withdrawn'){
+                return `<div class="actions">
+                    <button class="btn ghost" style="opacity:0.8;cursor:default;">Cancelled by worker</button>
+                    <button class="btn ghost" onclick="deleteJobRequest('${req._id}')">Delete</button>
+                </div>`;
+            }
+            return `
+                <div class="actions">
+                    <button class="btn primary" onclick="acceptJobRequest('${req._id}')"><i class="fas fa-check"></i> Accept</button>
+                    <button class="btn danger" onclick="rejectJobRequest('${req._id}')"><i class="fas fa-xmark"></i> Reject</button>
+                </div>
+            `;
+        }
+
+        function openChat(userId, fromActivity=false){
+            if(!userId) return;
+            const from = fromActivity ? '&from=activity' : '';
+            window.location.href = `../chat.html?id=${userId}${from}`;
+        }
+
+        async function rejectInvite(inviteId){
+            if(!inviteId) return;
+            try{
+                await fetch(`${API_BASE}/api/jobs/reject/${inviteId}`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function rejectJobRequest(appId){
+            if(!appId) return;
+            try{
+                await fetch(`${API_BASE}/api/employer/job-requests/${appId}/reject`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function acceptJobRequest(appId){
+            if(!appId) return;
+            try{
+                await fetch(`${API_BASE}/api/employer/job-requests/${appId}/accept`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function cancelJobRequest(appId){
+            if(!appId) return;
+            try{
+                await fetch(`${API_BASE}/api/employer/job-requests/${appId}/cancel`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function deleteJobRequest(appId){
+            if(!appId) return;
+            if(!confirm("Delete this request?")) return;
+            try{
+                await fetch(`${API_BASE}/api/employer/job-requests/${appId}`,{
+                    method:'DELETE',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function loadData(){
+            if(!token){
+                window.location.href = '../login.html';
+                return;
+            }
+            try{
+                const [invRes, jobRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/employer/accepted-invites`, { headers:{'Authorization':`Bearer ${token}`} }),
+                    fetch(`${API_BASE}/api/employer/job-requests`, { headers:{'Authorization':`Bearer ${token}`} })
+                ]);
+                const invited = invRes.ok ? await invRes.json() : [];
+                const jobReqs = jobRes.ok ? await jobRes.json() : [];
+                renderInvited(invited);
+                renderJobRequests(jobReqs);
+            }catch(err){
+                document.getElementById('invited-list').innerHTML = '<p class="empty">Unable to load invites.</p>';
+                document.getElementById('job-requests-list').innerHTML = '<p class="empty">Unable to load job requests.</p>';
+                console.error(err);
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

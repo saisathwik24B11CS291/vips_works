@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --gray: #94a3b8; --danger: #ef4444; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .back-btn { text-decoration: none; color: var(--text); font-size: 20px; }
+        
+        .menu-list { display: flex; flex-direction: column; gap: 10px; }
+        .menu-item {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: 0.2s;
+        }
+        .menu-item:hover { background: #2d3748; }
+        .menu-item span { font-weight: 500; }
+        .menu-item i { color: var(--gray); font-style: normal; }
+
+        .logout-btn {
+            margin-top: 20px;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="profile.html" class="back-btn">←</a>
+        <h2>Settings</h2>
+    </div>
+
+    
+
+        <a href="#" class="menu-item" style="opacity: 0.5;">
+            <span>🔔 Notifications (Soon)</span>
+            <i>→</i>
+        </a>
+
+        <a href="#" class="menu-item logout-btn" onclick="logout()">
+            <span>🚪 Logout</span>
+        </a>
+    </div>
+
+    <script>
+        function logout() {
+            if(confirm("Are you sure you want to logout?")) {
+                localStorage.clear();
+                window.location.href = "login.html";
+            }
+        }
+    </script>
+</body>
+</html>

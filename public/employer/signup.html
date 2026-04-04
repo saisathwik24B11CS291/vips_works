@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employer Signup | Join the Network</title>
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --card-bg: #111111;
+            --accent-bluee: #5d3bf6; 
+            --text-gray: #94a3b8;
+            --border-color: #222222;
+        }
+
+        body { 
+            margin: 0; font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-dark); color: white;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh;
+        }
+
+        .auth-card {
+            width: 100%; max-width: 400px; padding: 40px 20px;
+            text-align: center;
+        }
+
+        .logo-circle {
+            width: 60px; height: 60px; background: var(--accent-blue);
+            border-radius: 15px; margin: 0 auto 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; font-weight: bold;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+
+        h2 { margin: 0 0 10px; font-size: 24px; }
+        p { color: var(--text-gray); font-size: 14px; margin-bottom: 30px; }
+
+        .input-group { position: relative; margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 11px; color: var(--text-gray); margin-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+        
+        .input-group input, .input-group select {
+            width: 100%; background: var(--card-bg); border: 1px solid var(--border-color);
+            padding: 14px; border-radius: 12px; color: white; font-size: 14px;
+            box-sizing: border-box; outline: none; transition: 0.3s;
+        }
+        .input-group input:focus { border-color: var(--accent-blue); }
+
+        .signup-btn {
+            width: 100%; background: var(--accent-blue); color: white;
+            border: none; padding: 15px; border-radius: 12px;
+            font-weight: bold; font-size: 16px; cursor: pointer;
+            margin-top: 10px; transition: 0.3s;
+        }
+        .signup-btn:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        .footer-link { margin-top: 25px; font-size: 14px; color: var(--text-gray); }
+        .footer-link a { color: var(--accent-blue); text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="auth-card">
+    <div class="logo-circle">E</div>
+    <h2>Create Business Account</h2>
+    <p>Find and select the best workers for your projects.</p>
+
+    <form id="signup-form" onsubmit="handleSignup(event)">
+        <div class="input-group">
+            <label>Full Business Name</label>
+            <input type="text" id="username" placeholder="e.g. Skyline Logistics" required>
+        </div>
+
+        
+
+        <div class="input-group">
+            <label>Email Address</label>
+            <input type="email" id="email" placeholder="admin@business.com" required>
+        </div>
+
+        <div class="input-group">
+            <label>Phone Number</label>
+            <input type="tel" id="phone" placeholder="+91 XXXX XXX XXX" required>
+        </div>
+
+        <div class="input-group">
+            <label>Create Password</label>
+            <input type="password" id="password" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="signup-btn">Get Started</button>
+    </form>
+
+    <div class="footer-link">
+        Already have an account? <a href="login.html">Login</a>
+    </div>
+</div>
+
+<script>
+    async function handleSignup(event) {
+    event.preventDefault();
+
+    // 1. Capture elements to avoid 'null' reading errors
+
+    const usernameEl = document.getElementById('username');
+    const emailEl = document.getElementById('email');
+    const passwordEl = document.getElementById('password');
+    const phoneEl = document.getElementById('phone');
+
+    // 2. Extract values safely
+    
+    // 4. Create the payload
+    const signupData = {
+        role: 'employer',
+        username: usernameEl.value.trim(),
+        email: emailEl.value.trim(),
+        password: passwordEl.value,
+        phone: phoneEl.value.trim(),
+        // CRITICAL: This key MUST match 'businessCategory' in your server.js route
+        businessCategory: selectedCategory 
+    };
+
+    try {
+        // Use the absolute URL since your server is on Port 5000
+        const response = await fetch('http://localhost:5000/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(signupData)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("Signup Successful! Welcome " + signupData.username);
+            window.location.href = 'login.html';
+        } else {
+            // Displays the error from the server (like "next is not a function" or "Email exists")
+            alert(result.error || result.message || "Signup failed");
+        }
+    } catch (error) {
+        console.error("Network Error:", error);
+        alert("Connection Error: Is your server running on Port 5000?");
+    }
+}
+</script>
+</body>
+</html>

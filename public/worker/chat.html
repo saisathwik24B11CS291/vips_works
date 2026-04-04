@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #000; color: white; margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Header */
+        .chat-header { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #262626; position: sticky; top: 0; background: #000; z-index: 10; }
+        .back-btn { font-size: 24px; cursor: pointer; margin-right: 15px; text-decoration: none; color: white; }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-info img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; background: #262626; }
+
+        /* Messages Area */
+        #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 75%; padding: 10px 15px; border-radius: 18px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
+        .sent { align-self: flex-end; background-color: #3797f0; color: white; border-bottom-right-radius: 4px; }
+        .received { align-self: flex-start; background-color: #262626; color: white; border-bottom-left-radius: 4px; }
+        .msg img { width: 100%; max-width: 250px; border-radius: 10px; display: block; margin-bottom: 5px; }
+
+        /* Input Area - Fixed at Bottom */
+        .input-area { padding: 10px 15px; border-top: 1px solid #262626; display: flex; gap: 12px; align-items: center; background: #000; }
+        .input-wrapper { flex: 1; position: relative; display: flex; align-items: center; background: #121212; border: 1px solid #363636; border-radius: 25px; padding: 5px 15px; }
+        #message-input { flex: 1; background: transparent; border: none; padding: 8px 0; color: white; outline: none; font-size: 15px; }
+        .camera-label { cursor: pointer; font-size: 20px; margin-right: 10px; opacity: 0.8; }
+        .camera-label:hover { opacity: 1; }
+        .send-btn { background: none; border: none; color: #3797f0; font-weight: bold; cursor: pointer; font-size: 16px; padding-left: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-header">
+    <a href="messages.html" class="back-btn">←</a>
+    <div class="user-info" id="partner-info">
+        <img src="https://via.placeholder.com/35" id="partner-pic">
+        <b id="partner-name">Loading...</b>
+    </div>
+</div>
+
+<div id="chat-box"></div>
+
+<div class="input-area">
+    <label for="file-input" class="camera-label">📷</label>
+    <input type="file" id="file-input" hidden accept="image/*" onchange="sendImage(this)">
+    
+    <div class="input-wrapper">
+        <input type="text" id="message-input" placeholder="Message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+        <button class="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const API_BASE = window.location.origin.replace('8081', '5000').replace('5500', '5000'); 
+    
+    const token = localStorage.getItem('token');
+    const urlParams = new URLSearchParams(window.location.search);
+    const partnerId = urlParams.get('id'); // This ID comes from the URL
+    const chatBox = document.getElementById('chat-box');
+    let partnerRole = ""; 
+
+    // Inside public/worker/chat.html
+async function loadChatDetails() {
+        // Validation
+        if (!partnerId) {
+            alert("No user selected!");
+            window.location.href = "messages.html";
+            return;
+        }
+
+        try {
+            console.log("Fetching profile for:", partnerId);
+            
+            // ✅ FIX 2: Correct Endpoint usage
+            const res = await fetch(`${API_BASE}/api/users/profile/${partnerId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!res.ok) throw new Error("Profile Not Found");
+
+            const user = await res.json();
+            
+            // Update UI
+            document.getElementById('partner-name').innerText = user.username;
+            partnerRole = user.role; // Critical for sending messages
+            
+            if(user.profilePicture) {
+                document.getElementById('partner-pic').src = API_BASE + user.profilePicture;
+            }
+
+            // Load messages only after we confirm user exists
+            loadMessages();
+            setInterval(loadMessages, 3000); // Live chat
+
+        } catch (err) {
+            console.error("Error loading chat:", err);
+            document.getElementById('partner-name').innerText = "User Not Found";
+            document.getElementById('partner-name').style.color = "red";
+        }
+    }
+    async function loadMessages() {
+        try {
+            const res = await fetch(`${API_BASE}/api/messages/${partnerId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const messages = await res.json();
+            
+            // Decode my ID safely
+            const myId = JSON.parse(atob(token.split('.')[1])).id;
+
+            const oldScroll = chatBox.scrollTop;
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+
+            chatBox.innerHTML = messages.map(m => `
+                <div class="msg ${m.sender === myId ? 'sent' : 'received'}">
+                    ${m.image ? `<img src="${API_BASE}${m.image}">` : ''}
+                    ${m.text ? `<div>${m.text}</div>` : ''}
+                </div>
+            `).join('');
+
+            // Scroll to bottom only if user was already at bottom or it's first load
+            if (isNearBottom) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (err) { console.error(err); }
+    }
+// New function to notify server the worker has read the messages
+async function markAsRead() {
+    await fetch(`${API_BASE}/api/messages/read/${partnerId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+}
+    async function sendImage(input) {
+        if (!input.files[0]) return;
+        
+        const formData = new FormData();
+        formData.append('messageImage', input.files[0]);
+        formData.append('data', JSON.stringify({
+            receiverId: partnerId,
+            receiverModel: partnerRole === 'employer' ? 'Employer' : 'Worker'
+        }));
+
+        try {
+            const res = await fetch(`${API_BASE}/api/messages/send-image`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (res.ok) {
+                input.value = ""; // Clear file input
+                loadMessages();
+            }
+        } catch (err) { console.error("Error sending image:", err); }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('message-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        // ✅ FIX 3: Safety check
+        if (!partnerRole) {
+            alert("Wait for profile to load...");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/api/messages/send`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    receiverId: partnerId,
+                    receiverModel: partnerRole === 'employer' ? 'Employer' : 'Worker',
+                    text: text
+                })
+            });
+
+            if (res.ok) {
+                input.value = '';
+                loadMessages(); 
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    if (token) loadChatDetails();
+    else window.location.href = 'login.html';
+</script>
+
+</body>
+</html>

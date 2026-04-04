@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employer Dashboard | VIPs</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --card-bg: #121212;
+            --accent-blue: #0095f6;
+            --accent-green: #00f076;
+            --text-gray: #a8a8a8;
+            --border: #262626;
+            --danger: #ff3b30;
+        }
+
+        body {
+            margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark); color: white; padding-bottom: 80px;
+        }
+
+        /* --- 1st IMAGE FIX: HEADER & LOGO ALIGNMENT --- */
+        header {
+            padding: 10px 20px; background: #000; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 1000;
+        }
+        .logo-group { display: flex; flex-direction: column; align-items: flex-start; }
+        .logo { font-size: 22px; font-weight: bold; font-family: cursive; letter-spacing: 1px; }
+        
+        /* The clickable location under logo */
+        .location-trigger {
+            display: flex; align-items: center; gap: 4px;
+            color: var(--accent-blue); font-size: 11px; cursor: pointer;
+            margin-top: -2px;
+        }
+
+        .header-actions { display: flex; gap: 15px; align-items: center; }
+        .icon-link { position: relative; color: white; text-decoration: none; font-size: 20px; }
+        
+        .badge {
+            position: absolute; top: -5px; right: -5px;
+            background: var(--danger); color: white; font-size: 10px;
+            font-weight: bold; padding: 2px 5px; border-radius: 50%;
+            border: 2px solid #000; display: none;
+        }
+
+        .logout-btn { background: #262626; border: none; color: white; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 15px; }
+
+        /* --- SEARCH BAR MAIN --- */
+        .search-container-main { margin-bottom: 25px; position: relative; }
+        .search-container-main i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-gray); font-size: 14px; }
+        .search-bar-main {
+            width: 100%; background: #262626; border: none;
+            padding: 12px 15px 12px 45px; border-radius: 10px; color: white;
+            font-size: 14px; box-sizing: border-box; outline: none;
+        }
+        .search-suggestions{
+            position:absolute;top:42px;left:0;right:0;
+            background:#0f111a;border:1px solid #262626;border-radius:10px;
+            z-index:1200; box-shadow:0 12px 30px rgba(0,0,0,0.35); display:none;
+            max-height:260px; overflow-y:auto;
+        }
+        .suggest-item{
+            padding:10px 12px; display:flex; justify-content:space-between; align-items:center;
+            cursor:pointer; color:white; font-size:14px; border-bottom:1px solid #181c24;
+        }
+        .suggest-item:last-child{border-bottom:none;}
+        .suggest-item:hover{background:#1a1f2b;}
+        .suggest-tag{
+            font-size:11px; color:#9ca3af; background:#111827; border:1px solid #1f2937;
+            padding:2px 6px; border-radius:8px;
+        }
+
+        /* --- MODAL CSS: RESTORED FROM IMAGES --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none;
+            justify-content: center; align-items: center; z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: #1a1a1a; padding: 25px; border-radius: 20px;
+            width: 85%; max-width: 380px; text-align: center; border: 1px solid #333;
+        }
+        
+        /* Modal Search Bar */
+        .modal-search {
+            background: #262626; border-radius: 10px; padding: 10px 15px;
+            display: flex; align-items: center; gap: 10px; margin-bottom: 15px;
+            border: 1px solid #444;
+        }
+        .modal-search input {
+            background: transparent; border: none; color: white;
+            width: 100%; outline: none; font-size: 14px;
+        }
+
+        /* Detecting Button */
+        .detect-btn {
+            width: 100%; padding: 15px; background: var(--accent-blue);
+            color: white; border: none; border-radius: 12px;
+            font-weight: bold; margin-bottom: 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+
+        .city-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .city-item {
+            padding: 12px; background: #333; border: 1px solid #444;
+            color: white; border-radius: 10px; cursor: pointer; font-size: 13px;
+        }
+        .cancel-btn { background: none; border: none; color: var(--text-gray); cursor: pointer; margin-top: 15px; }
+
+        /* --- SERVICES GRID --- */
+        h3 { font-size: 15px; margin: 25px 0 15px; font-weight: 600; }
+        .services-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+        @media (min-width: 769px) { .services-grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .service-card {
+            background: var(--card-bg); border-radius: 12px; padding: 20px 10px;
+            text-align: center; border: 1px solid var(--border); cursor: pointer;
+        }
+        .icon-box {
+            width: 40px; height: 40px; background: var(--accent-blue);
+            border-radius: 10px; margin: 0 auto 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;
+        }
+        .service-card p { margin: 0; font-size: 12px; font-weight: 500; }
+
+        .add-post-card {
+            width: 100%; max-width: 180px; height: 140px; 
+            background: rgba(0, 240, 118, 0.05);
+            border: 2px dashed var(--accent-green); border-radius: 15px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; cursor: pointer; text-decoration: none; color: white;
+        }
+        .plus-icon {
+            width: 35px; height: 35px; background: var(--accent-green);
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 18px; margin-bottom: 8px; color: black;
+        }
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 60px;
+            background: #000; border-top: 1px solid #262626;
+            display: flex; justify-content: space-around; align-items: center; z-index: 1000;
+        }
+        .nav-item { color: #737373; text-decoration: none; font-size: 22px; }
+        .nav-item.active { color: #ffffff; }
+
+        /* Sub-modal fix */
+        .modal-sub {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark); z-index: 1100; display: none;
+            flex-direction: column;
+        }
+        .modal-header { padding: 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+        .back-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-right: 15px; }
+        .job-type-card {
+            background: var(--card-bg); border: 1px solid var(--border);
+            padding: 15px; border-radius: 10px; margin: 10px 20px;
+            display: flex; align-items: center; cursor: pointer;
+        }
+        .dot { width: 6px; height: 6px; background: var(--accent-blue); border-radius: 50%; margin-right: 15px; }
+        /* Posted jobs */
+        .my-jobs-section { margin-top: 25px; }
+        .jobs-list { display: flex; flex-direction: column; gap: 12px; }
+        .job-card { background:#111; border:1px solid #222; border-radius:14px; padding:12px; }
+        .job-card h4 { margin:0 0 4px 0; color: var(--accent-blue); cursor:pointer; }
+        .job-meta { color: var(--text-gray); font-size:12px; margin:2px 0; }
+        .badge { display:inline-block; padding:3px 8px; border-radius:10px; font-size:11px; border:1px solid #333; color:white; }
+        .badge.open { background:#113c1c; color:#6ee7b7; border-color:#1f6f3b; }
+        .badge.closed { background:#3a0f0f; color:#fca5a5; border-color:#7f1d1d; }
+        .badge.draft { background:#1f2937; color:#93c5fd; border-color:#1d4ed8; }
+
+        .job-modal-overlay{
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:3000;
+        }
+        .job-modal{
+            background:#161b22;border:1px solid #30363d;border-radius:14px;
+            width:90%;max-width:420px;padding:20px;color:white;
+        }
+        .job-modal h3{margin:0 0 6px 0;}
+        .job-modal p{margin:4px 0;color:#c9d1d9;}
+        .job-modal .close-btn{
+            background:#da3633;color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;margin-top:12px;
+        }
+        /* Premium Modal Overlay with Blur */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* Darker overlay */
+    backdrop-filter: blur(8px); /* Professional blur effect */
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+/* Modal Content Styling */
+.modal-content {
+    background: #1a1a1a;
+    padding: 30px;
+    border-radius: 24px; /* Smoother corners */
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    border: 1px solid #333;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+/* Blue Detect Button */
+.detect-btn {
+    width: 100%;
+    padding: 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: background 0.2s ease;
+}
+
+.detect-btn:active {
+    background: #0056b3;
+    transform: scale(0.98);
+}
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <div class="logo">VIPs</div>
+            <div class="location-trigger" onclick="toggleLocationPopup(true)">
+                <i class="fas fa-map-marker-alt"></i>
+                <span id="user-location-display">Loading...</span>
+                <i class="fas fa-chevron-down" style="font-size: 8px;"></i>
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="requests.html" class="icon-link">
+                <i class="far fa-heart"></i>
+                <span id="follow-request-badge" class="badge"></span>
+            </a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="search-container-main">
+            <i class="fas fa-search"></i>
+            <input type="text" id="main-search" class="search-bar-main" placeholder="Search for services or your posts...">
+            <div id="search-suggestions" class="search-suggestions"></div>
+        </div>
+<div id="sub-modal" class="modal-sub">
+    <div class="modal-header">
+        <button class="back-btn" onclick="closeSubSection()">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2 id="modal-title">Category Jobs</h2>
+    </div>
+    <div id="sub-list"></div>
+</div>
+        <h3>Find Services</h3>
+        <div class="services-grid">
+            <div class="service-card" onclick="openSubSection('General Labour')">
+                <div class="icon-box"><i class="fas fa-users"></i></div>
+                <p>General Labour / Helpers</p>
+            </div>
+            <div class="service-card" onclick="openSubSection('Delivery')">
+                <div class="icon-box"><i class="fas fa-truck"></i></div>
+                <p>Delivery & Transport</p>
+            </div>
+            <div class="service-card" onclick="openSubSection('skill')">
+                <div class="icon-box"><i class="fas fa-calendar-alt"></i></div>
+                <p>Skilled Workers</p>
+            </div>
+        </div>
+
+        <h3>Post a Job</h3>
+        <a href="post-job.html" class="add-post-card">
+            <div class="plus-icon"><i class="fas fa-plus"></i></div>
+            <div style="font-weight: 700; font-size: 14px;">Add Post</div>
+            <div style="font-size: 11px; color: var(--text-gray);">Post a job</div>
+        </a>
+
+        <div class="my-jobs-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:15px;">📄 My Posted Jobs</h3>
+                <button onclick="window.location.href='post-job.html'" style="background:#1a1a1a;border:1px solid #333;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;">+ Post Job</button>
+            </div>
+            <div class="jobs-list" id="my-jobs-list" style="margin-top:12px;">
+                <p style="color:#888;">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="city-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top: 0;">Select Your City</h3>
+            
+            <div class="modal-search">
+                <i class="fas fa-search" style="color:#888;"></i>
+                <input type="text" id="city-search" placeholder="Search city..." onkeyup="filterCities()">
+            </div>
+
+            <button id="detect-btn-el" onclick="detectLocation()" class="detect-btn">
+                <i class="fas fa-crosshairs"></i> Detect My Location
+            </button>
+            
+            <div class="city-grid" id="city-grid">
+                <button class="city-item" onclick="confirmLocation('Mumbai')">Mumbai</button>
+                <button class="city-item" onclick="confirmLocation('Delhi')">Delhi</button>
+                <button class="city-item" onclick="confirmLocation('Bangalore')">Bangalore</button>
+                <button class="city-item" onclick="confirmLocation('Hyderabad')">Hyderabad</button>
+                <button class="city-item" onclick="confirmLocation('Rajamahendravaram')">Rajamahendravaram</button>
+            </div>
+            <button class="cancel-btn" onclick="toggleLocationPopup(false)">Cancel</button>
+        </div>
+    </div>
+
+    <div id="sub-modal" class="modal-sub">
+        <div class="modal-header">
+            <button class="back-btn" onclick="closeSubSection()"><i class="fas fa-arrow-left"></i></button>
+            <h2 id="modal-title" style="font-size: 18px; margin: 0; font-weight: 600;">Category Title</h2>
+        </div>
+        <div id="sub-list"></div>
+    </div>
+
+    <!-- Job detail modal -->
+    <div id="job-detail-modal" class="job-modal-overlay" onclick="if(event.target===this)closeJobDetails();">
+      <div class="job-modal">
+        <h3 id="job-detail-title">Job Title</h3>
+        <p><strong>Status:</strong> <span id="job-detail-status"></span></p>
+        <p><strong>Location:</strong> <span id="job-detail-location"></span></p>
+        <p><strong>Budget:</strong> <span id="job-detail-pay"></span></p>
+        <p><strong>Details:</strong><br><span id="job-detail-description"></span></p>
+        <p><strong>Tasks:</strong><br><span id="job-detail-tasks"></span></p>
+        <p><strong>Posted on:</strong> <span id="job-detail-date"></span></p>
+        <button class="close-btn" onclick="closeJobDetails()">Close</button>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+        
+        <a href="home.html" class="nav-item active"><i class="fas fa-home"></i></a>
+        <a href="../search.html" class="nav-item"><i class="fas fa-search"></i></a>
+        <a href="messages.html" class="nav-item"><i class="far fa-paper-plane"></i></a>
+        <a href="profile.html" class="nav-item"><i class="far fa-user"></i></a>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:5000";
+        const token = localStorage.getItem('token');
+        let myJobs = [];
+        let searchTimer = null;
+
+        const jobData = {
+            
+            "General Labour": ["Loading", "Cleaning", "Helper"],
+            "Delivery": ["Food & Restaurant", "Grocery Delivery", "Medical & Pharmaceutical","Long-Distance Trucking"],
+            "skill": ["Electrician", "Plumber", "Carpenter", "Welder"],
+        };
+
+        // --- LOCATION LOGIC: FIXED & UNIFIED ---
+        function toggleLocationPopup(isOpen) {
+            const modal = document.getElementById('city-modal');
+            const detectBtn = document.getElementById('detect-btn-el');
+            if (isOpen) {
+                modal.style.display = 'flex';
+                detectBtn.innerHTML = '<i class="fas fa-crosshairs"></i> Detect My Location';
+                detectBtn.disabled = false;
+            } else { modal.style.display = 'none'; }
+        }
+
+        function filterCities() {
+            const input = document.getElementById('city-search').value.toLowerCase();
+            const cities = document.getElementsByClassName('city-item');
+            for (let city of cities) {
+                city.style.display = city.innerText.toLowerCase().includes(input) ? "block" : "none";
+            }
+        }
+
+        async function detectLocation() {
+    const btn = document.getElementById('detect-btn-el');
+    // Visual feedback during detection
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Detecting...';
+    btn.disabled = true;
+
+    if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser");
+        resetDetectBtn();
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+            // Reverse Geocoding API call
+            const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+            const data = await res.json();
+            
+            // Format: Gandepalle, Kakinada (533437), Andhra Pradesh
+            const locality = data.locality || "";
+            const city = data.city || "";
+            const postcode = data.postcode ? ` (${data.postcode})` : "";
+            const state = data.principalSubdivision || "";
+            
+            const fullAddress = `${locality}, ${city}${postcode}, ${state}`;
+            
+            // Save the formatted string to database
+            await confirmLocation(fullAddress);
+        } catch (err) {
+            console.error("Geocoding failed:", err);
+            alert("Could not determine city name.");
+            resetDetectBtn();
+        }
+    }, (error) => {
+        alert("Location access denied. Please select a city manually.");
+        resetDetectBtn();
+    });
+}
+
+// Helper to reset button state
+function resetDetectBtn() {
+    const btn = document.getElementById('detect-btn-el');
+    btn.innerHTML = '<i class="fas fa-crosshairs"></i> Detect My Location';
+    btn.disabled = false;
+}
+
+        async function confirmLocation(cityName) {
+            try {
+                const res = await fetch(`${API_BASE}/api/profile/update`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ location: cityName }) 
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('user-location-display').innerText = data.location;
+                    toggleLocationPopup(false);
+                }
+            } catch (err) { console.error("Update failed", err); }
+        }
+
+        async function loadHeader() {
+            if (!token) window.location.href = '../login.html';
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const user = await res.json();
+                document.getElementById('user-location-display').innerText = user.location || "Select City";
+            } catch (e) { }
+        }
+
+        // --- SECTION LOGIC ---
+        
+        // Function called when clicking "General Labour" on Home Page
+function openSubSection(category) {
+    const modal = document.getElementById('sub-modal');
+    document.getElementById('modal-title').innerText = category + " Jobs";
+    
+    // This list will now show the items seen in Image 2
+    const list = document.getElementById('sub-list');
+    list.innerHTML = ""; 
+    
+    jobData[category].forEach(job => {
+        const card = document.createElement('div');
+        card.className = "job-type-card";
+        card.innerHTML = `<div class="dot"></div><span>${job}</span>`;
+        
+        // Step 2: Clicking here leads to the Worker Blueprint List
+        card.onclick = () => {
+            window.location.href = `worker-list.html?job=${encodeURIComponent(job)}`;
+        };
+        list.appendChild(card);
+    });
+    modal.style.display = "flex";
+}
+// In your home.html script section
+function closeSubSection() {
+    // Hide the modal overlay
+    document.getElementById('sub-modal').style.display = "none";
+    // Enable scrolling on the home page again
+    document.body.style.overflow = "auto";
+}
+
+        async function loadMyJobs(){
+            if(!token) return;
+            const list = document.getElementById('my-jobs-list');
+            try{
+                const res = await fetch(`${API_BASE}/api/jobs/mine`,{
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                if(!res.ok) throw new Error("Failed to load jobs");
+                myJobs = await res.json();
+                renderMyJobs();
+            }catch(err){
+                console.error(err);
+                if(list) list.innerHTML = "<p style='color:#888;'>Failed to load your jobs.</p>";
+            }
+        }
+
+        function renderMyJobs(){
+            const list = document.getElementById('my-jobs-list');
+            if(!list) return;
+            if(!myJobs.length){
+                list.innerHTML = "<p style='color:#888;'>You haven’t posted any jobs yet.</p>";
+                return;
+            }
+            list.innerHTML = myJobs.map((job,idx)=>{
+                const loc = job.location || job.employerId?.location || "Location not set";
+                const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Budget not set");
+                const badge = job.status || "open";
+                return `
+                    <div class="job-card">
+                        <h4 onclick="showJobDetails(${idx})">${job.title}</h4>
+                        <div class="job-meta">📍 ${loc}</div>
+                        <div class="job-meta">💰 ${pay}</div>
+                        <span class="badge ${badge}">${badge}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showJobDetails(idx){
+            const job = myJobs[idx];
+            if(!job) return;
+            const loc = job.location || job.employerId?.location || "Location not set";
+            const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Budget not set");
+            document.getElementById('job-detail-title').innerText = job.title || "Job";
+            document.getElementById('job-detail-status').innerText = job.status || "open";
+            document.getElementById('job-detail-location').innerText = loc;
+            document.getElementById('job-detail-pay').innerText = pay;
+            document.getElementById('job-detail-description').innerText = job.details || job.workDetails || "No description provided.";
+            document.getElementById('job-detail-tasks').innerText = job.tasks || "Not provided";
+            document.getElementById('job-detail-date').innerText = job.createdAt ? new Date(job.createdAt).toLocaleString() : "Not available";
+            document.getElementById('job-detail-modal').style.display = 'flex';
+        }
+
+        function closeJobDetails(){
+            document.getElementById('job-detail-modal').style.display = 'none';
+        }
+
+        async function checkRequests(){
+            if(!token) return;
+            try{
+                const [acceptedRes, jobReqRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/employer/accepted-invites`, { headers:{'Authorization':`Bearer ${token}`} }),
+                    fetch(`${API_BASE}/api/employer/job-requests`, { headers:{'Authorization':`Bearer ${token}`} })
+                ]);
+                const accepted = acceptedRes.ok ? await acceptedRes.json() : [];
+                const jobReqs = jobReqRes.ok ? await jobReqRes.json() : [];
+                const total = (accepted?.length || 0) + (jobReqs?.length || 0);
+                const badge = document.getElementById('follow-request-badge');
+                if(badge){
+                    if(total > 0){
+                        badge.textContent = total > 9 ? '9+' : total;
+                        badge.style.display = 'block';
+                    }else{
+                        badge.style.display = 'none';
+                    }
+                }
+            }catch(err){
+                console.error("Request badge error", err);
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '../login.html'; }
+
+        // --- SEARCH LOGIC ---
+        const searchInput = document.getElementById('main-search');
+        const suggestionsBox = document.getElementById('search-suggestions');
+
+        function buildSuggestions(term){
+            const t = term.trim().toLowerCase();
+            if(!t){
+                suggestionsBox.style.display = 'none';
+                return;
+            }
+            const suggestions = [];
+            // main categories
+            Object.keys(jobData).forEach(cat=>{
+                const cl = cat.toLowerCase();
+                if(cl.includes(t) || t.includes(cl)){
+                    suggestions.push({label: cat+" Jobs", tag:"Category", action: `goCategory('${cat}')`});
+                }
+                jobData[cat].forEach(sub=>{
+                    const sl = sub.toLowerCase();
+                    if(sl.includes(t) || t.includes(sl)){
+                        suggestions.push({label: sub, tag: cat, action: `goWorkerList('${sub}')`});
+                    }
+                });
+            });
+            // my jobs
+            myJobs.forEach((job,idx)=>{
+                const blob = `${job.title||""} ${job.location||""}`.toLowerCase();
+                if(blob.includes(t)){
+                    suggestions.push({label: job.title || "Job", tag:"My Post", action: `goMyJob(${idx})`});
+                }
+            });
+            suggestionsBox.innerHTML = suggestions.slice(0,8).map(s=>`
+                <div class="suggest-item" onclick="${s.action};hideSuggestions();">
+                    <span>${s.label}</span>
+                    <span class="suggest-tag">${s.tag}</span>
+                </div>
+            `).join('');
+            suggestionsBox.style.display = suggestions.length ? 'block' : 'none';
+        }
+
+        function hideSuggestions(){ suggestionsBox.style.display='none'; }
+        function goWorkerList(job){ window.location.href = `worker-list.html?job=${encodeURIComponent(job)}`; }
+        function goCategory(cat){ openSubSection(cat); }
+        function goMyJob(idx){ showJobDetails(idx); }
+
+        if(searchInput){
+            searchInput.addEventListener('input', (e)=>{
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(()=> buildSuggestions(e.target.value), 150);
+            });
+            searchInput.addEventListener('focus', ()=> buildSuggestions(searchInput.value));
+        }
+        document.addEventListener('click', (e)=>{
+            if(!suggestionsBox.contains(e.target) && e.target !== searchInput){
+                hideSuggestions();
+            }
+        });
+
+        window.onload = () => { loadHeader(); loadMyJobs(); checkRequests(); setInterval(checkRequests, 30000); };
+    </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add New Project</title>
+    <style>
+        :root { --bg: #000; --card: #111; --blue: #3b82f6; --border: #222; }
+        body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .form-card { width: 100%; max-width: 400px; background: var(--card); padding: 25px; border-radius: 20px; border: 1px solid var(--border); }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; }
+        input, textarea { width: 100%; background: #000; border: 1px solid var(--border); padding: 12px; border-radius: 10px; color: white; box-sizing: border-box; outline: none; }
+        .preview-box { width: 100%; height: 200px; background: #080808; border: 1px dashed #333; border-radius: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .preview-box img { width: 100%; height: 100%; object-fit: cover; }
+        .btn { width: 100%; background: var(--blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn:disabled { background: #333; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="form-card">
+    <h3 style="margin-top:0;">📸 Post New Project</h3>
+    <form id="project-form">
+        <div class="preview-box" id="preview-box">
+            <span style="color:#444">Photo Preview</span>
+        </div>
+        
+        <div class="input-group">
+            <label>Upload Work Image</label>
+            <input type="file" id="projectImage" accept="image/*" required>
+        </div>
+
+        <div class="input-group">
+            <label>Project Title</label>
+            <input type="text" id="projectTitle" placeholder="e.g. Modern Office Interior" required>
+        </div>
+
+        <div class="input-group">
+            <label>Small Description</label>
+            <textarea id="projectDesc" rows="2" placeholder="Briefly describe this project..."></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn">Post Project</button>
+        <button type="button" class="btn" style="background:transparent; color:#666; margin-top:10px;" onclick="history.back()">Cancel</button>
+    </form>
+</div>
+
+<script>
+    // Image Preview Logic
+    document.getElementById('projectImage').onchange = function(e) {
+        const reader = new FileReader();
+        reader.onload = function() {
+            const box = document.getElementById('preview-box');
+            box.innerHTML = `<img src="${reader.result}">`;
+        }
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    document.getElementById('project-form').onsubmit = async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        const token = localStorage.getItem('token');
+        
+        btn.disabled = true;
+        btn.innerText = "Posting...";
+
+        const formData = new FormData();
+        formData.append('title', document.getElementById('projectTitle').value);
+        formData.append('portfolioDesc', document.getElementById('projectDesc').value);
+        formData.append('image', document.getElementById('projectImage').files[0]);
+
+        try {
+            // Using the specific employer project route on port 5000
+            const response = await fetch('http://localhost:5000/api/employer/profile/project', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                alert("Project posted successfully!");
+                window.location.href = 'profile.html';
+            } else {
+                alert("Failed to post project. Ensure you are logged in as an employer.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error connecting to server.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Post Project";
+        }
+    };
+</script>
+</body>
+</html>

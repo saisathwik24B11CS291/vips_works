@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Follow Requests</title>
+    <style>
+        :root{
+            --bg:#000;
+            --card:#121212;
+            --border:#262626;
+            --text:#e5e7eb;
+            --muted:#94a3b8;
+            --success:#22c55e;
+            --danger:#ef4444;
+        }
+        body { margin:0; font-family:'Inter', sans-serif; background:var(--bg); color:var(--text); padding:20px; }
+        .header { display:flex; align-items:center; gap:15px; margin-bottom:20px; }
+        .back-btn { color:var(--text); text-decoration:none; font-size:22px; font-weight:bold; }
+        h2 { margin:0; font-size:20px; }
+        .request-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+        .user-info { display:flex; align-items:center; gap:12px; cursor:pointer; }
+        .avatar { width:45px; height:45px; border-radius:50%; object-fit:cover; background:#333; }
+        .name { font-weight:bold; font-size:14px; display:block; }
+        .role { color:var(--muted); font-size:12px; }
+        .btn-group { display:flex; gap:8px; }
+        .btn { border:none; padding:6px 14px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; }
+        .btn-accept { background:var(--success); color:white; }
+        .btn-reject { background:#262626; color:var(--danger); border:1px solid var(--border); }
+        #empty-state { text-align:center; margin-top:80px; color:var(--muted); display:none; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="messages.html" class="back-btn">&larr;</a>
+        <h2>Follow Requests</h2>
+    </div>
+
+    <div id="requests-list">
+        <p style="text-align:center; color:var(--muted);">Loading...</p>
+    </div>
+
+    <div id="empty-state">
+        <p>No pending follow requests.</p>
+    </div>
+
+    <script>
+    const API_BASE = "http://localhost:5000";
+    const token = localStorage.getItem('token');
+
+    async function fetchRequests() {
+        try {
+            const res = await fetch(`${API_BASE}/api/users/requests`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const requests = res.ok ? await res.json() : [];
+            
+            const list = document.getElementById('requests-list');
+            const empty = document.getElementById('empty-state');
+
+            if (!requests || requests.length === 0) {
+                list.innerHTML = "";
+                empty.style.display = "block";
+                return;
+            }
+
+            empty.style.display = "none";
+            list.innerHTML = requests.map(user => `
+                <div class="request-card" id="card-${user._id}">
+                   <div class="user-info" onclick="openProfile('${user._id}')">
+                        <img src="${user.profilePicture ? API_BASE + user.profilePicture : 'https://via.placeholder.com/50'}" class="avatar">
+                        <div>
+                            <span class="name">${user.username}</span>
+                            <span class="role">${(user.profession && user.profession.length > 0) ? user.profession[0] : 'Worker'}</span>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-accept" onclick="handleAction('${user._id}', 'confirm')">Accept</button>
+                        <button class="btn btn-reject" onclick="handleAction('${user._id}', 'reject')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) { 
+            console.error("Load failed", err); 
+        }
+    }
+
+    async function handleAction(userId, actionType) {
+        const endpoint = actionType === 'confirm' 
+            ? `/api/users/confirm/${userId}` 
+            : `/api/users/requests/${userId}`;
+        
+        const method = actionType === 'confirm' ? 'POST' : 'DELETE';
+
+        try {
+            const res = await fetch(`${API_BASE}${endpoint}`, {
+                method: method,
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                const card = document.getElementById(`card-${userId}`);
+                if(card) card.remove();
+                if (document.querySelectorAll('.request-card').length === 0) {
+                    document.getElementById('empty-state').style.display = 'block';
+                }
+            }
+        } catch (err) { console.error("Action failed", err); }
+    }
+
+    function openProfile(id){
+        if(!id) return;
+        window.location.href = `../friendProfile.html?id=${id}`;
+    }
+
+    if(!token){
+        window.location.href = '../login.html';
+    }else{
+        fetchRequests();
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<div class="container">
+    <div class="header">
+        <button onclick="history.back()">←</button>
+        <h2>Following</h2>
+    </div>
+
+    <div id="following-list">
+        </div>
+</div>
+
+<script>
+    async function loadFollowing() {
+        // Fetch only users that the current worker is following
+        const res = await fetch(`${API_BASE}/api/users/following`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const employers = await res.json();
+        
+        const list = document.getElementById('following-list');
+        list.innerHTML = employers.map(emp => `
+            <div class="user-card" onclick="window.location.href='../friendProfile.html?id=${emp._id}'">
+                <img src="${API_BASE}${emp.profilePicture}" class="avatar">
+                <div class="details">
+                    <b>${emp.companyName || emp.username}</b>
+                    <span>Verified Employer</span>
+                </div>
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        `).join('');
+    }
+    loadFollowing();
+</script>

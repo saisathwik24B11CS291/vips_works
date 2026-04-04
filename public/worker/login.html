@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPs | Login</title>
+    <link rel="stylesheet" href="../styles.css"> 
+    <link rel="stylesheet" href="src/nav.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --vip-gold: #fbbf24;
+            --text-dark: #0f172a;
+            --text-light: #64748b;
+            --white: #ffffff;
+            --error: #ef4444;
+            --success: #10b981;
+            --input-bg: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--white);
+            padding: 40px;
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        .brand-logo {
+            text-align: center;
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 5px;
+            letter-spacing: -3px;
+            background: linear-gradient(135deg, var(--primary), var(--vip-gold));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            font-style: italic;
+        }
+
+        h2 {
+            text-align: center;
+            color: var(--text-dark);
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 35px;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+
+        .form-group { margin-bottom: 22px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background: var(--input-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            background: var(--white);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        .input-wrapper input {
+            flex: 1;
+            padding: 14px 16px;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            outline: none;
+            color: var(--text-dark);
+            width: 100%;
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            border-left: 1px solid var(--border-color);
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 0.7rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            padding: 0 15px;
+            height: 24px;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--text-dark);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button[type="submit"]:hover {
+            background-color: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        #message {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            min-height: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="brand-logo">VIPs</div>
+        <h2>Sign in to Workers Portal</h2>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label>Username</label>
+                <div class="input-wrapper">
+                    <input type="text" id="login-username" placeholder="Enter your username" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                    <button type="button" class="toggle-btn" id="toggle-btn">Show</button>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn">Continue</button>
+        </form>
+
+        <p id="message"></p>
+        <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+            <div id="google-btn" style="width:48%;"></div>
+            <button id="forgot-toggle" type="button" style="width:48%;padding:12px;border:none;background:transparent;color:var(--primary);font-weight:700;cursor:pointer;">Forgot password?</button>
+        </div>
+        <div id="forgot-panel" style="display:none; margin-top:18px; border:1px solid var(--border-color); padding:12px; border-radius:12px; background:#f8fafc;">
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Email</label>
+                <div class="input-wrapper" style="border:1px solid var(--border-color);">
+                    <input type="email" id="fp-email" placeholder="you@email.com">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:12px;">
+                <button id="send-code-btn" type="button" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;">Send code</button>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Code</label>
+                <div class="input-wrapper" style="border:1px solid var(--border-color);">
+                    <input type="text" id="fp-code" placeholder="6-digit code">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>New password</label>
+                <div class="input-wrapper" style="border:1px solid var(--border-color);">
+                    <input type="password" id="fp-newpass" placeholder="New password">
+                </div>
+            </div>
+            <button id="reset-btn" type="button" style="width:100%;padding:12px;border:none;border-radius:10px;background:#0f172a;color:#fff;font-weight:700;cursor:pointer;">Reset password</button>
+        </div>
+        <p class="footer">New to VIPs? <a href="signup.html">Create account</a></p>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:5000"; // Or "http://127.0.0.1:5000"
+        const loginForm = document.getElementById('login-form');
+        const messagePara = document.getElementById('message');
+        const submitBtn = document.getElementById('submit-btn');
+        const pwInput = document.getElementById('login-password');
+        const toggleBtn = document.getElementById('toggle-btn');
+        const forgotToggle = document.getElementById('forgot-toggle');
+        const forgotPanel = document.getElementById('forgot-panel');
+        const sendCodeBtn = document.getElementById('send-code-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const googleBtnContainer = document.getElementById('google-btn');
+
+        toggleBtn.addEventListener('click', () => {
+            const isPw = pwInput.type === 'password';
+            pwInput.type = isPw ? 'text' : 'password';
+            toggleBtn.innerText = isPw ? 'Hide' : 'Show';
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Processing...";
+    messagePara.innerText = "";
+
+    const username = document.getElementById('login-username').value;
+    const password = pwInput.value;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                username, 
+                password, 
+                role: 'worker' 
+            })
+        });
+
+        // FIXED: Changed 'response' to 'res' to match the fetch above
+        const data = await res.json();
+
+        if (res.ok) {
+             if (data.role == 'employer') {
+                    alert("Access Denied: This account is not an worker.");
+                    return;
+                }
+
+            // STORE DATA CORRECTLY
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('userRole', data.role);
+            
+            // Save the ID for interlinking logic
+            localStorage.setItem('userId', data.userId || (data.user && data.user._id));
+
+            messagePara.style.color = "#10b981"; // Using standard hex for success
+            messagePara.innerText = "Welcome back! Redirecting...";
+            
+            setTimeout(() => {
+                if (data.role === 'employer') {
+                    // Redirect to employer dashboard if they somehow got here
+                    
+                    messagePara.style.color = "#ef4444";
+                   messagePara.innerText = "no data is found?"; 
+                } else {
+                    // Redirect to worker profile
+                    window.location.href = "../worker/profile.html";
+                }
+            }, 1000);
+        } else {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Continue";
+            messagePara.style.color = "#ef4444"; // Using standard hex for error
+            messagePara.innerText = data.message || "Invalid credentials";
+        }
+    } catch (err) {
+       
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Continue";
+        messagePara.style.color = "#ef4444";
+        messagePara.innerText = "Connection error. Is the server running?";
+        console.error("Login Error:", err);
+    }
+});
+
+// Forgot password UI
+forgotToggle.addEventListener('click', ()=>{
+    forgotPanel.style.display = forgotPanel.style.display === 'none' ? 'block' : 'none';
+});
+
+sendCodeBtn.addEventListener('click', async ()=>{
+    const email = document.getElementById('fp-email').value.trim();
+    if(!email) return alert('Enter email');
+    sendCodeBtn.disabled = true; sendCodeBtn.innerText = 'Sending...';
+    try{
+        const res = await fetch(`${API_BASE}/api/auth/forgot`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Code sent' : 'Failed'));
+    }catch(e){ alert('Network error'); }
+    sendCodeBtn.disabled = false; sendCodeBtn.innerText = 'Send code';
+});
+
+resetBtn.addEventListener('click', async ()=>{
+    const email = document.getElementById('fp-email').value.trim();
+    const code = document.getElementById('fp-code').value.trim();
+    const newPassword = document.getElementById('fp-newpass').value.trim();
+    if(!email || !code || !newPassword) return alert('Fill all fields');
+    resetBtn.disabled = true; resetBtn.innerText = 'Resetting...';
+    try{
+        const res = await fetch(`${API_BASE}/api/auth/reset`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ email, code, newPassword })
+        });
+        const data = await res.json();
+        alert(data.message || (res.ok ? 'Password reset' : 'Failed'));
+    }catch(e){ alert('Network error'); }
+    resetBtn.disabled = false; resetBtn.innerText = 'Reset password';
+});
+
+// Google sign-in via Google Identity Services
+async function getGoogleClientId(){
+    if(window.__googleClientId) return window.__googleClientId;
+    try{
+        const res = await fetch(`${API_BASE}/api/config/google-client`);
+        const data = await res.json();
+        if(res.ok && data.clientId){
+            window.__googleClientId = data.clientId;
+            return data.clientId;
+        }
+    }catch(err){
+        console.error('Google client fetch failed', err);
+    }
+    return null;
+}
+
+function waitForGoogleSdk(timeoutMs = 5000){
+    return new Promise((resolve, reject)=>{
+        const start = Date.now();
+        const tick = ()=>{
+            if(window.google?.accounts?.id){ return resolve(); }
+            if(Date.now() - start > timeoutMs) return reject(new Error('Google SDK not loaded'));
+            setTimeout(tick, 50);
+        };
+        tick();
+    });
+}
+
+async function initGoogle(){
+    const clientId = await getGoogleClientId();
+    if(!clientId){
+        googleBtnContainer.innerHTML = '<small style="color:#ef4444">Google login unavailable (set GOOGLE_CLIENT_ID)</small>';
+        return;
+    }
+    try{
+        await waitForGoogleSdk();
+    }catch(err){
+        googleBtnContainer.innerHTML = '<small style="color:#ef4444">Google script failed to load</small>';
+        return;
+    }
+    google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleCredentialResponse
+    });
+    google.accounts.id.renderButton(
+        googleBtnContainer,
+        { theme: 'outline', size: 'large', width: 200, shape:'pill', text:'continue_with' }
+    );
+    google.accounts.id.prompt();
+}
+
+async function handleCredentialResponse(resp){
+    try{
+        const res = await fetch(`${API_BASE}/api/auth/google`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ idToken: resp.credential, role:'worker' })
+        });
+        const data = await res.json();
+        if(res.ok){
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('userRole', data.role);
+            localStorage.setItem('userId', data.userId);
+            window.location.href = "../worker/profile.html";
+        }else{
+            alert(data.message || 'Google login failed');
+        }
+    }catch(e){
+        alert('Network error');
+    }
+}
+
+window.onload = ()=> {
+    loadUserLocation?.(); // keep any existing onload; safe guard
+    initGoogle();
+};
+</script>
+</body>
+</html>

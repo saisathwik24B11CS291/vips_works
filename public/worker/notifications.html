@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Follow Requests</title>
+    <style>
+        body { 
+            margin: 0; 
+            font-family: 'Inter', sans-serif; 
+            background-color: #000000; 
+            color: white; 
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .back-btn {
+            color: white;
+            text-decoration: none;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        h2 { margin: 0; font-size: 20px; }
+
+        .request-card {
+            background: #121212;
+            border: 1px solid #262626;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 45px; 
+            height: 45px; 
+            border-radius: 50%; 
+            background: #333;
+            object-fit: cover;
+        }
+
+        .name { font-weight: bold; font-size: 14px; display: block; }
+        .role { color: #94a3b8; font-size: 12px; }
+
+        .btn-group { display: flex; gap: 8px; }
+
+        .btn {
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-confirm { background: #22c55e; color: white; }
+        .btn-delete { background: #334155; color: white; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="javascript:history.back()" class="back-btn">←</a>
+        <h2>Follow Requests</h2>
+    </div>
+
+    <div id="requests-list">
+        <p style="color:gray; text-align:center; margin-top:20px;">Loading requests...</p>
+    </div>
+
+    <script>
+    const API_BASE = "http://127.0.0.1:5000"; 
+
+    async function loadFollowRequests() {
+        const token = localStorage.getItem('token');
+        const list = document.getElementById('requests-list');
+
+        if (!token) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        try {
+            console.log("Fetching from:", `${API_BASE}/api/users/requests`); // CHECK CONSOLE
+            
+            const res = await fetch(`${API_BASE}/api/users/requests`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            
+            // 1. Check if Server returned an error (404 or 500)
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`Server Error: ${res.status} - ${text}`);
+            }
+
+            const requests = await res.json();
+            console.log("Data received:", requests); // CHECK CONSOLE
+
+            // 2. Check if data is an Array
+            if (!Array.isArray(requests)) {
+                // Try to find the array if it's nested (e.g. { requests: [...] })
+                if (requests.requests && Array.isArray(requests.requests)) {
+                    // It was nested, so let's use the inner array
+                    renderList(requests.requests, list);
+                    return;
+                }
+                throw new Error("Data format error: Expected an array (list) of requests.");
+            }
+
+            if (requests.length === 0) {
+                list.innerHTML = '<p style="color:gray; text-align:center;">No pending requests.</p>';
+                return;
+            }
+
+            renderList(requests, list);
+
+        } catch (error) {
+            console.error(error);
+            // THIS WILL PRINT THE REAL ERROR ON YOUR SCREEN
+            list.innerHTML = `<p style="color:red; text-align:center; padding:20px;">
+                <strong>Error:</strong> ${error.message}<br>
+                <small>Check Console (F12) for details.</small>
+            </p>`;
+        }
+    }
+
+    // Helper function to render the HTML
+    function renderList(data, listElement) {
+        listElement.innerHTML = data.map(req => {
+            // Tries to find the user object safely
+            const user = req.sender || req.follower || req.fromUser || req; 
+            
+            if (!user || !user._id) return `<div style="color:red; padding:10px;">Invalid User Data Found</div>`;
+
+            const profileImg = user.profilePicture 
+                ? `${API_BASE}${user.profilePicture}` 
+                : 'https://via.placeholder.com/45?text=U';
+
+            return `
+            <div class="request-card">
+                <div class="user-info">
+                    <img src="${profileImg}" class="avatar">
+                    <div>
+                        <span class="name">${user.username || "Unknown"}</span>
+                        <span class="role">${user.profession ? user.profession[0] : "Worker"}</span>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-confirm" onclick="confirmRequest('${user._id}')">Confirm</button>
+                    <button class="btn btn-delete" onclick="deleteRequest('${user._id}')">Delete</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
+    async function confirmRequest(userId) {
+        // ... (Keep your confirm function same as before)
+        const token = localStorage.getItem('token');
+        if(!userId) return alert("User ID missing");
+        
+        try {
+            const res = await fetch(`${API_BASE}/api/users/confirm/${userId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                loadFollowRequests(); // Refresh list
+            } else {
+                alert("Failed to confirm");
+            }
+        } catch(e) { alert("Error connecting"); }
+    }
+
+    // Run immediately
+    loadFollowRequests();
+</script>
+</body>
+</html>

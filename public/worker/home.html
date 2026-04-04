@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker Home | VIPs</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<style>
+
+:root{
+  --bg:#05070d;
+  --panel:#111827;
+  --panel-2:#0d1117;
+  --border:#1f2937;
+  --text:#e5e7eb;
+  --muted:#9ca3af;
+  --accent:#3b82f6;
+  --success:#22c55e;
+  --danger:#ef4444;
+  --radius:14px;
+  --shadow:0 12px 30px rgba(0,0,0,0.35);
+}
+
+*{
+  box-sizing:border-box;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+body{
+  margin:0;
+  background:radial-gradient(circle at 20% -10%, rgba(59,130,246,0.1), transparent 35%), 
+             radial-gradient(circle at 80% -20%, rgba(34,197,94,0.12), transparent 40%),
+             var(--bg);
+  color:var(--text);
+  padding-bottom:90px;
+}
+
+/* HEADER */
+
+header{
+padding:12px 20px;
+background:rgba(5,7,13,0.92);
+backdrop-filter:blur(12px);
+border-bottom:1px solid var(--border);
+display:flex;
+justify-content:space-between;
+align-items:center;
+position:sticky;
+top:0;
+z-index:1000;
+}
+
+.logo{
+font-size:24px;
+font-weight:bold;
+font-family:cursive;
+}
+
+/* LOCATION */
+
+.top-nav{
+padding:10px 20px;
+background:rgba(5,7,13,0.92);
+backdrop-filter:blur(12px);
+border-bottom:1px solid var(--border);
+position:sticky;
+top:56px;
+z-index:900;
+}
+
+.location-trigger{
+display:flex;
+align-items:center;
+gap:8px;
+cursor:pointer;
+color:var(--text);
+font-weight:bold;
+font-size:0.95rem;
+padding:10px 14px;
+background:linear-gradient(120deg, rgba(59,130,246,0.14), rgba(59,130,246,0.05));
+border:1px solid var(--border);
+border-radius:999px;
+}
+
+/* JOB TABS */
+
+.jobs-toolbar{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:stretch;
+  margin:12px 0 18px;
+  position:sticky;
+  top:112px;
+  z-index:850;
+}
+.pill-tabs{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:6px;
+  box-shadow:var(--shadow);
+}
+.tab-btn{
+  flex:1;
+  padding:11px 12px;
+  border:none;
+  border-radius:999px;
+  background:var(--panel-2);
+  color:var(--muted);
+  cursor:pointer;
+  font-weight:700;
+  transition:0.25s;
+  min-width:120px;
+}
+.tab-btn.active{
+  background:var(--accent);
+  color:white;
+  box-shadow:0 8px 24px rgba(59,130,246,0.35);
+}
+.search-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.mini-btn{
+  background:var(--panel-2);
+  border:1px solid var(--border);
+  color:var(--muted);
+  border-radius:12px;
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.mini-btn i{pointer-events:none;}
+.mini-btn:hover{color:#cdd9e5;border-color:var(--accent);}
+
+/* JOB CARD */
+
+.job-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:14px;
+  animation:fadeIn .25s ease;
+  box-shadow:var(--shadow);
+}
+
+@keyframes fadeIn{
+from{opacity:0;transform:translateY(8px)}
+to{opacity:1;transform:translateY(0)}
+}
+
+.job-card button{
+  margin-right:10px;
+  padding:10px 14px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+.job-card button:first-of-type{
+  background:var(--success);
+  color:white;
+}
+
+.job-card button:last-of-type{
+  background:var(--danger);
+  color:white;
+}
+
+/* BOTTOM NAV */
+
+.bottom-nav{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+ height:70px;
+ background:rgba(13,17,23,0.96);
+ border-top:1px solid var(--border);
+ display:flex;
+ justify-content:space-around;
+ align-items:center;
+ padding-bottom:calc(env(safe-area-inset-bottom, 0) + 4px);
+ backdrop-filter:blur(10px);
+}
+
+.nav-item{
+  color:var(--muted);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:100%;
+  gap:6px;
+  font-size:13px;
+  text-decoration:none;
+}
+
+.nav-item.active{
+  color:white;
+}
+
+/* MODAL */
+
+.modal-overlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.85);
+display:none;
+justify-content:center;
+align-items:center;
+z-index:2000;
+}
+
+.modal-content{
+  background:#101420;
+  padding:22px;
+  border-radius:18px;
+  width:90%;
+  max-width:420px;
+  text-align:center;
+  border:1px solid var(--border);
+  box-shadow:var(--shadow);
+}
+
+.search-container{
+  background:#0f172a;
+  border-radius:12px;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+  border:1px solid #1f2937;
+}
+
+.search-container input{
+  background:transparent;
+  border:none;
+  color:var(--text);
+  width:100%;
+  outline:none;
+  font-size:15px;
+}
+
+.detect-btn{
+  width:100%;
+  padding:15px;
+  background:linear-gradient(120deg, var(--accent), #2563eb);
+  color:white;
+  border:none;
+  border-radius:12px;
+  font-weight:700;
+  margin:8px 0 18px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  box-shadow:0 10px 24px rgba(59,130,246,0.25);
+}
+
+.city-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:16px 0;
+}
+
+.city-item{
+  padding:12px;
+  background:#0f172a;
+  border:1px solid #1f2937;
+  color:var(--text);
+  border-radius:12px;
+  cursor:pointer;
+  font-size:0.95rem;
+  transition:all .2s ease;
+}
+.city-item:hover{border-color:var(--accent);}
+
+.cancel-btn{
+  background:none;
+  border:none;
+  color:#737373;
+  cursor:pointer;
+  margin-top:10px;
+}
+
+/* Job detail modal */
+.job-modal-overlay{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.8);
+display:none;
+align-items:center;
+justify-content:center;
+z-index:3000;
+}
+.job-modal{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:18px;
+  width:92%;
+  max-width:440px;
+  padding:20px;
+  color:var(--text);
+  box-shadow:var(--shadow);
+}
+.job-modal h3{margin:0 0 6px 0;}
+.job-modal p{margin:4px 0; color:#c9d1d9;}
+.job-modal .close-btn{
+  background:var(--danger);
+  color:white;
+  border:none;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  margin-top:12px;
+}
+
+/* MOBILE FIRST REFINEMENTS */
+@media (max-width:768px){
+  header{padding:12px 16px;}
+  .top-nav{padding:10px 16px; top:56px;}
+  h2{margin:6px 0 10px;}
+  .jobs-toolbar{top:108px;}
+  .pill-tabs{margin:0 2px;}
+  .search-row{gap:8px;}
+  .search-container{width:100%; margin:0;}
+  .mini-btn{width:40px;height:40px;}
+  .tab-btn{width:100%; text-align:center;}
+  .job-card{padding:14px;}
+  .job-card h3{margin-top:4px;}
+  .job-card button{flex:1;}
+  .job-card div[style*="display:flex"]{flex-direction:column;}
+  .bottom-nav{height:74px;}
+  .city-grid{grid-template-columns:1fr;}
+}
+@media (min-width:769px){
+  .jobs-toolbar{flex-direction:row;}
+  .toolbar-cluster{flex:1;}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">VIPs</div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <a href="job-alerts.html" class="nav-item" style="color:var(--text);text-decoration:none;position:relative;font-size:22px;">
+      <i class="far fa-heart"></i>
+      <span id="job-updates-badge" style="position:absolute;top:-6px;right:-10px;background:#ef4444;color:white;font-size:10px;font-weight:bold;padding:2px 6px;border-radius:10px;display:none;">0</span>
+    </a>
+  </div>
+</header>
+
+<div class="top-nav">
+<div class="location-trigger" onclick="toggleLocationPopup(true)">
+<i class="fas fa-map-marker-alt"></i>
+<span id="home-location-text">Loading...</span>
+<i class="fas fa-chevron-down"></i>
+</div>
+</div>
+
+<div style="padding:20px">
+
+<h2>Jobs For You</h2>
+
+<div class="jobs-toolbar">
+  <div class="pill-tabs">
+    <button id="tab-invited" class="tab-btn active" onclick="showInvited()">Invited</button>
+    <button id="tab-posted" class="tab-btn" onclick="showPosted()">Posted</button>
+  </div>
+
+  <div id="invite-row" class="search-row">
+    <div id="invite-search-bar" class="search-container" style="flex:1;">
+      <i class="fas fa-search"></i>
+      <input type="text" id="invite-search-input" placeholder="Search invited jobs" oninput="setInviteSearch()" />
+    </div>
+    <button id="invite-menu-btn" class="mini-btn" onclick="toggleInviteMenu()"><i class="fas fa-ellipsis-vertical"></i></button>
+  </div>
+
+  <div id="posted-row" class="search-row" style="display:none;">
+    <div id="posted-search-bar" class="search-container" style="flex:1;">
+      <i class="fas fa-search"></i>
+      <input type="text" id="posted-search-input" placeholder="Search posted jobs" oninput="setPostedSearch()" />
+    </div>
+    <button id="posted-menu-btn" class="mini-btn" onclick="togglePostedMenu()"><i class="fas fa-ellipsis-vertical"></i></button>
+  </div>
+</div>
+
+<div id="jobs-for-you">
+<p style="color:#888">Loading jobs...</p>
+</div>
+
+</div>
+
+<div class="bottom-nav">
+
+<a href="home.html" class="nav-item active">
+<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+</svg>
+</a>
+
+<a href="../search.html" class="nav-item">
+<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+</svg>
+</a>
+
+<a href="messages.html" class="nav-item">
+<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+<line x1="22" y1="2" x2="11" y2="13"></line>
+<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+</svg>
+</a>
+
+<a href="profile.html" class="nav-item">
+<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="7" r="4"></circle>
+</svg>
+</a>
+
+</div>
+
+<div id="city-modal" class="modal-overlay">
+<div class="modal-content">
+
+<h3>Select Your City</h3>
+
+<div class="search-container">
+<i class="fas fa-search"></i>
+<input type="text" id="city-search" placeholder="Search for your city..." onkeyup="filterCities()">
+</div>
+
+<button id="detect-btn-el" onclick="detectLocation()" class="detect-btn">
+<i class="fas fa-crosshairs"></i> Detect My Location
+</button>
+
+<div class="city-grid">
+<button class="city-item" onclick="confirmLocation('Mumbai')">Mumbai</button>
+<button class="city-item" onclick="confirmLocation('Delhi')">Delhi</button>
+<button class="city-item" onclick="confirmLocation('Bangalore')">Bangalore</button>
+<button class="city-item" onclick="confirmLocation('Hyderabad')">Hyderabad</button>
+<button class="city-item" onclick="confirmLocation('Rajamahendravaram')">Rajamahendravaram</button>
+</div>
+
+<button class="cancel-btn" onclick="toggleLocationPopup(false)">Cancel</button>
+
+</div>
+</div>
+
+<!-- Job detail modal -->
+<div id="job-detail-modal" class="job-modal-overlay" onclick="if(event.target===this)closeJobDetails();">
+  <div class="job-modal">
+    <h3 id="job-detail-title">Job Title</h3>
+    <p><strong>Employer:</strong> <span id="job-detail-employer"></span></p>
+    <p><strong>Location:</strong> <span id="job-detail-location"></span></p>
+    <p><strong>Pay:</strong> <span id="job-detail-pay"></span></p>
+    <p><strong>Details:</strong><br><span id="job-detail-description"></span></p>
+    <p><strong>Tasks:</strong><br><span id="job-detail-tasks"></span></p>
+    <button class="close-btn" onclick="closeJobDetails()">Close</button>
+  </div>
+</div>
+
+<script>
+
+const API_BASE="http://localhost:5000";
+const token=localStorage.getItem('token');
+let postedJobsCache=[];
+let invitesCache=[];
+let showAllLocations=false;
+let inviteSearchTerm="";
+let postedSearchTerm="";
+let inviteFilterStatus="pending"; // pending | accepted | rejected | all
+let postedFilterStatus="all"; // applied | notapplied | all
+let openMenu=null;
+// job updates badge
+async function checkJobUpdates(){
+    try{
+        const res = await fetch(`${API_BASE}/api/worker/job-updates`,{
+            headers:{'Authorization':`Bearer ${token}`}
+        });
+        if(!res.ok) return;
+        const updates = await res.json();
+        const unseen = (updates||[]).filter(u=>u.workerSeen===false && ['accepted','rejected','withdrawn'].includes(u.status)).length;
+        const badge = document.getElementById('job-updates-badge');
+        if(badge){
+            if(unseen>0){
+                badge.textContent = unseen>9 ? '9+' : unseen;
+                badge.style.display = 'inline-block';
+            }else{
+                badge.style.display = 'none';
+            }
+        }
+    }catch(err){
+        console.error(err);
+    }
+}
+
+function showInvited(){
+document.getElementById("tab-invited").classList.add("active");
+document.getElementById("tab-posted").classList.remove("active");
+document.getElementById('invite-row').style.display='flex';
+document.getElementById('posted-row').style.display='none';
+loadJobInvites();
+}
+
+function showPosted(){
+document.getElementById("tab-posted").classList.add("active");
+document.getElementById("tab-invited").classList.remove("active");
+document.getElementById('invite-row').style.display='none';
+document.getElementById('posted-row').style.display='flex';
+loadPostedJobs();
+}
+
+window.onload = function () {
+    loadUserLocation();
+    showInvited();
+    checkJobUpdates();
+    setInterval(checkJobUpdates,30000);
+};
+console.log("TOKEN:", token);
+async function loadUserLocation(){
+
+if(!token)return;
+
+try{
+
+const res=await fetch(`${API_BASE}/api/auth/me`,{
+headers:{'Authorization':`Bearer ${token}`}
+});
+
+const user=await res.json();
+const location = user.location || "Select City";
+
+document.getElementById('home-location-text').innerText = location;
+
+localStorage.setItem("userLocation", location);
+}catch{
+document.getElementById('home-location-text').innerText="Select City";
+}
+
+}
+
+async function loadJobInvites(){
+
+const container=document.getElementById("jobs-for-you");
+container.innerHTML="<p style='color:#888'>Loading invites...</p>";
+
+try{
+
+    const res=await fetch(`${API_BASE}/api/worker/invites`,{
+headers:{"Authorization":"Bearer "+token}
+});
+
+const invites=await res.json();
+invitesCache = invites;
+renderInvites();
+return;
+
+if(!invites.length){
+container.innerHTML="<p style='color:#888'>No job invites</p>";
+return;
+}
+
+container.innerHTML="";
+
+invites.forEach(invite=>{
+    // ✅ NEW: Get previous location with fallbacks
+    const jobLoc = invite.jobLocation || invite.workerLocationAtInvite || invite.employerId?.location || "Not specified";
+    const prevLoc = invite.workerLocationAtInvite || invite.jobLocation || invite.employerId?.location || '—';
+
+    // Normalize locations to avoid false mismatch (case/extra text)
+    const userLocNorm = document.getElementById('home-location-text').innerText.trim().toLowerCase();
+    const jobLocNorm = (jobLoc || "").trim().toLowerCase();
+    const sameLocation = userLocNorm && jobLocNorm &&
+        (jobLocNorm.includes(userLocNorm) || userLocNorm.includes(jobLocNorm));
+
+    container.innerHTML+=`
+        <div class="job-card">
+            <!-- ✅ UPDATED: Show snapshot of previous location -->
+            <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
+            
+            <p style="color:#4da6ff;">📍 Job Location: ${jobLoc}</p>
+
+            ${
+                jobLoc !== "Not specified" &&
+                !sameLocation
+                ? `<p style="color:orange; font-size:13px;">
+                        ⚠ You are currently in ${document.getElementById('home-location-text').innerText}
+                   </p>`
+                : ""
+            }
+
+            <p>${invite.employerId?.username || "Employer"}</p>
+            <p>${invite.message}</p>
+
+            <button onclick="acceptJob('${invite._id}')">Accept</button>
+            <button onclick="rejectJob('${invite._id}')">Reject</button>
+        </div>
+    `;
+});
+
+}catch{
+container.innerHTML="<p>Failed to load invites</p>";
+}
+
+}
+
+function setInviteSearch(){
+    inviteSearchTerm = (document.getElementById('invite-search-input').value||"").toLowerCase();
+    renderInvites();
+}
+function setPostedSearch(){
+    postedSearchTerm = (document.getElementById('posted-search-input').value||"").toLowerCase();
+    renderPostedJobs();
+}
+function setInviteFilter(status){
+  inviteFilterStatus=status;
+  const menu=document.getElementById('invite-menu');
+  if(menu) menu.remove();
+  renderInvites();
+}
+function setPostedFilter(status){
+  postedFilterStatus=status;
+  const menu=document.getElementById('posted-menu');
+  if(menu) menu.remove();
+  renderPostedJobs();
+}
+
+// --- Small three-dot menus next to tabs ---
+function toggleInviteMenu(){
+    let menu = document.getElementById('invite-menu');
+    if(menu){ menu.remove(); return; }
+    const trigger = document.getElementById('invite-menu-btn');
+    const rect = trigger.getBoundingClientRect();
+    menu = document.createElement('div');
+    menu.id = 'invite-menu';
+    menu.style.cssText = `position:fixed;top:${rect.bottom+6}px;left:${rect.left}px;z-index:4000;background:#0f1620;border:1px solid #30363d;border-radius:10px;padding:6px;width:190px;`;
+    menu.innerHTML = `
+      <div style="padding:6px 8px;color:#8b949e;font-size:12px;">Invites Filter</div>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setInviteFilter('accepted')">Accepted</button>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setInviteFilter('pending')">Pending</button>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setInviteFilter('all')">All</button>
+    `;
+    document.body.appendChild(menu);
+    setOutsideClose(menu);
+}
+
+function togglePostedMenu(){
+    let menu = document.getElementById('posted-menu');
+    if(menu){ menu.remove(); return; }
+    const trigger = document.getElementById('posted-menu-btn');
+    const rect = trigger.getBoundingClientRect();
+    menu = document.createElement('div');
+    menu.id = 'posted-menu';
+    menu.style.cssText = `position:fixed;top:${rect.bottom+6}px;left:${rect.left-140}px;z-index:4000;background:#0f1620;border:1px solid #30363d;border-radius:10px;padding:6px;width:190px;`;
+    menu.innerHTML = `
+      <div style="padding:6px 8px;color:#8b949e;font-size:12px;">Posted Filter</div>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setPostedFilter('applied')">Applied</button>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setPostedFilter('notapplied')">Not Applied</button>
+      <button style="width:100%;padding:8px;border:none;background:none;color:white;text-align:left;cursor:pointer;" onclick="setPostedFilter('all')">All</button>
+    `;
+    document.body.appendChild(menu);
+    setOutsideClose(menu);
+}
+
+function setOutsideClose(menuEl){
+    if(openMenu && openMenu!==menuEl && openMenu.parentNode){ openMenu.remove(); }
+    openMenu = menuEl;
+    const handler = (e)=>{
+        if(!menuEl.contains(e.target) && e.target!==openMenu){
+            if(menuEl.parentNode) menuEl.remove();
+            document.removeEventListener('mousedown', handler);
+            openMenu=null;
+        }
+    };
+    setTimeout(()=> document.addEventListener('mousedown', handler), 0);
+}
+
+function renderInvites(){
+const container=document.getElementById("jobs-for-you");
+const term=(inviteSearchTerm||"").toLowerCase();
+const userLocText=document.getElementById('home-location-text').innerText;
+let filtered=(invitesCache||[]).filter(inv=>{
+    if(!term) return true;
+    const blob=`${inv.jobTitle||""} ${inv.message||""} ${inv.jobLocation||""} ${inv.employerId?.username||""}`.toLowerCase();
+    return blob.includes(term);
+});
+// apply invite status filter (local session markers)
+filtered = filtered.filter(inv=>{
+    const status = inv._localStatus || "pending";
+    if(inviteFilterStatus==="all") return true;
+    if(inviteFilterStatus==="pending") return status==="pending";
+    if(inviteFilterStatus==="accepted") return status==="accepted";
+    if(inviteFilterStatus==="rejected") return status==="rejected";
+    return true;
+});
+if(!filtered.length){
+    container.innerHTML="<p style='color:#888'>No job invites</p>";
+    return;
+}
+container.innerHTML="";
+filtered.forEach(invite=>{
+    const clean = (v="")=>{const t=(v||"").trim(); return t.toLowerCase()==="not specified" ? "" : t;};
+    const jobLocRaw = clean(invite.jobLocation);
+    const employerLocRaw = clean(invite.employerId?.location);
+    const workerSnapRaw = clean(invite.workerLocationAtInvite);
+
+    // Prefer jobLoc, but if it conflicts with employer location, show employer location as canonical
+    const displayJobLoc = jobLocRaw && employerLocRaw && jobLocRaw.toLowerCase() !== employerLocRaw.toLowerCase()
+        ? employerLocRaw
+        : (jobLocRaw || employerLocRaw || workerSnapRaw || "Not specified");
+
+    const prevLoc = workerSnapRaw || jobLocRaw || employerLocRaw || '—';
+    const userLocNorm = userLocText.trim().toLowerCase();
+    const jobLocNorm = (displayJobLoc || "").trim().toLowerCase();
+    const employerLocNorm = (invite.employerId?.location || "").trim().toLowerCase();
+    const sameJobLoc = userLocNorm && jobLocNorm && (jobLocNorm.includes(userLocNorm) || userLocNorm.includes(jobLocNorm));
+    const sameEmployerLoc = userLocNorm && employerLocNorm && (employerLocNorm.includes(userLocNorm) || userLocNorm.includes(employerLocNorm));
+    const showAlert = !(sameJobLoc && sameEmployerLoc); // warn if job OR employer location differs from worker
+    const status = invite._localStatus || "pending";
+    let actions = "";
+    if(status === "accepted"){
+        actions = `
+            <button disabled style="flex:1;background:#113c1c;color:#8bffd6;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Accepted</button>
+            <button onclick="cancelInvite('${invite._id}')" style="background:#30363d;color:#ff9393;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
+        `;
+    }else if(status === "rejected"){
+        actions = `
+            <button disabled style="flex:1;background:#3a0f0f;color:#fca5a5;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Rejected</button>
+            <button onclick="undoInvite('${invite._id}')" style="background:#30363d;color:#9abaff;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Undo</button>
+        `;
+    }else{
+        actions = `
+            <button onclick="acceptJob('${invite._id}')" style="background:#238636;color:white;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;flex:1;">Accept</button>
+            <button onclick="rejectJob('${invite._id}')" style="background:#da3633;color:white;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Reject</button>
+        `;
+    }
+
+    container.innerHTML+=`
+        <div class="job-card">
+            <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
+            <p style="color:#4da6ff;">📍 Job Location: ${displayJobLoc}</p>
+            ${displayJobLoc !== "Not specified" && showAlert ? `<p style="color:orange; font-size:13px;">⚠️ You are currently in ${userLocText}</p>` : ""}
+            <p>${invite.employerId?.username || "Employer"}</p>
+            <p>${invite.message}</p>
+            <div style="display:flex;gap:10px;">${actions}</div>
+        </div>
+    `;
+});
+}
+
+async function loadPostedJobs(){
+
+const container=document.getElementById("jobs-for-you");
+container.innerHTML="<p style='color:#888'>Loading posted jobs...</p>";
+
+try{
+
+const res=await fetch(`${API_BASE}/api/jobs/public`);
+postedJobsCache=await res.json();
+
+renderPostedJobs();
+
+}catch{
+container.innerHTML="<p>Failed to load jobs</p>";
+}
+
+}
+
+function renderPostedJobs(){
+    const container=document.getElementById("jobs-for-you");
+    const userLoc=(localStorage.getItem("userLocation")||document.getElementById('home-location-text').innerText||"").trim();
+    const term=(postedSearchTerm||"").toLowerCase();
+
+    if(!postedJobsCache.length){
+        container.innerHTML="<p style='color:#888'>No jobs available</p>";
+        return;
+    }
+
+    const matches = postedJobsCache.filter(j=>{
+        const loc = j.location || j.employerId?.location;
+        return locationMatches(loc,userLoc);
+    });
+    const others = postedJobsCache.filter(j=>{
+        const loc = j.location || j.employerId?.location;
+        return !locationMatches(loc,userLoc);
+    });
+
+    let listToShow = showAllLocations ? postedJobsCache : matches;
+    if(term){
+        listToShow = listToShow.filter(j=>{
+            const blob = `${j.title||""} ${j.location||j.employerId?.location||""} ${j.employerId?.username||""}`.toLowerCase();
+            return blob.includes(term);
+        });
+    }
+    // apply posted filter: applied vs not applied (uses local flag if present)
+    listToShow = listToShow.filter(j=>{
+        const applied = j._applied === true;
+        if(postedFilterStatus==="all") return true;
+        if(postedFilterStatus==="applied") return applied;
+        if(postedFilterStatus==="notapplied") return !applied;
+        return true;
+    });
+
+    if(!listToShow.length){
+        container.innerHTML=`<p style='color:#888'>No jobs near "${userLoc||"your location"}".</p>
+        ${others.length ? "<button style='margin-top:10px;padding:10px;border-radius:8px;border:none;background:#444;color:white;cursor:pointer;' onclick='toggleAllLocations(true)'>Show jobs in other locations</button>":""}`;
+        return;
+    }
+
+    container.innerHTML="";
+
+    listToShow.forEach((job)=>{
+        const displayLoc = job.location || job.employerId?.location || "Not specified";
+        const applied = job._applied === true;
+        const alertLine = (!locationMatches(displayLoc,userLoc) && userLoc)
+            ? `<p style="color:orange; font-size:13px;">&#9888;&#65039; You are currently in ${userLoc}</p>`
+            : "";
+
+        const actionButtons = applied
+            ? `<div style="display:flex;gap:10px;">
+                    <button disabled style="flex:1;background:#113c1c;color:#8bffd6;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Applied</button>
+                    <button onclick="cancelApplied('${job._id}')" style="background:#30363d;color:#ff9393;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
+               </div>`
+            : `<div style="display:flex;gap:10px;">
+                    <button onclick="applyJob('${job._id}', this)" style="flex:1;background:#238636;color:white;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Apply</button>
+                    <button style="background:#30363d;color:white;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;" onclick="showJobDetails(${postedJobsCache.indexOf(job)})">View details</button>
+               </div>`;
+
+        container.innerHTML+=`
+            <div class="job-card">
+                <h3 style="cursor:pointer;color:#4da6ff;" onclick="showJobDetails(${postedJobsCache.indexOf(job)})">${job.title}</h3>
+                <p style="color:#8b949e;">&#128205; ${displayLoc}</p>
+                ${alertLine}
+                ${actionButtons}
+            </div>
+        `;
+    });
+
+    if(!showAllLocations && others.length){
+        container.innerHTML+=`<button style="margin-top:12px;padding:10px;border-radius:8px;border:none;background:#444;color:white;cursor:pointer;" onclick="toggleAllLocations(true)">Show ${others.length} jobs in other locations</button>`;
+    } else if(showAllLocations && others.length){
+        container.innerHTML+=`<button style="margin-top:12px;padding:10px;border-radius:8px;border:none;background:#444;color:white;cursor:pointer;" onclick="toggleAllLocations(false)">Hide other locations</button>`;
+    }
+}
+function toggleAllLocations(val){
+showAllLocations=val;
+renderPostedJobs();
+}
+
+function locationMatches(jobLoc,userLoc){
+if(!jobLoc||!userLoc) return false;
+const a=jobLoc.toLowerCase();
+const b=userLoc.toLowerCase();
+return a.includes(b) || b.includes(a);
+}
+
+function showJobDetails(idx){
+const job=postedJobsCache[idx];
+if(!job) return;
+const displayLoc = job.location || job.employerId?.location || "Not specified";
+document.getElementById('job-detail-title').innerText=job.title||"Job";
+document.getElementById('job-detail-location').innerText=displayLoc;
+document.getElementById('job-detail-employer').innerText=job.employerId?.companyName || job.employerId?.username || "Employer";
+document.getElementById('job-detail-description').innerText=job.details || job.workDetails || "No description provided.";
+document.getElementById('job-detail-pay').innerText=job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Not specified");
+document.getElementById('job-detail-tasks').innerText=job.tasks || "Not provided";
+document.getElementById('job-detail-modal').style.display='flex';
+}
+
+function closeJobDetails(){
+document.getElementById('job-detail-modal').style.display='none';
+}
+
+async function applyJob(id, btn=null){
+    try{
+        await fetch(`${API_BASE}/api/jobs/apply/${id}`,{
+            method:"POST",
+            headers:{"Authorization":"Bearer "+token}
+        });
+        // mark as applied locally for filter
+        postedJobsCache = (postedJobsCache||[]).map(j=> j._id===id ? {...j, _applied:true} : j);
+        if(btn){
+            // swap buttons inline for immediate feedback
+            const card = btn.closest('.job-card');
+            if(card){
+                const wrap = document.createElement('div');
+                wrap.style.display='flex';
+                wrap.style.gap='10px';
+                wrap.innerHTML = `
+                    <button disabled style="flex:1;background:#113c1c;color:#8bffd6;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Applied</button>
+                    <button onclick="cancelApplied('${id}')" style="background:#30363d;color:#ff9393;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
+                `;
+                btn.replaceWith(wrap);
+            }
+        }
+        renderPostedJobs();
+    }catch(err){
+        alert("Could not apply right now");
+        console.error(err);
+    }
+}
+async function cancelApplied(id){
+    try{
+        await fetch(`${API_BASE}/api/jobs/apply/${id}`,{
+            method:"DELETE",
+            headers:{"Authorization":"Bearer "+token}
+        });
+        postedJobsCache = (postedJobsCache||[]).map(j=> j._id===id ? {...j, _applied:false} : j);
+        renderPostedJobs();
+    }catch(err){
+        console.error(err);
+    }
+}
+
+async function acceptJob(id){
+    try{
+        await fetch(`${API_BASE}/api/jobs/accept/${id}`,{
+            method:"POST",
+            headers:{"Authorization":"Bearer "+token}
+        });
+        // keep invite visible in-session marked accepted
+        invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"accepted"} : inv);
+        renderInvites();
+    }catch{}
+}
+
+async function rejectJob(id){
+    try{
+        await fetch(`${API_BASE}/api/jobs/reject/${id}`,{
+            method:"POST",
+            headers:{"Authorization":"Bearer "+token}
+        });
+        invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"rejected"} : inv);
+        renderInvites();
+    }catch{}
+}
+
+function cancelInvite(id){
+    // cancel accepted -> revert to pending locally and call reject to inform backend
+    rejectJob(id);
+    invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"pending"} : inv);
+    renderInvites();
+}
+
+function undoInvite(id){
+    invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"pending"} : inv);
+    renderInvites();
+}
+
+function toggleLocationPopup(isOpen){
+const modal=document.getElementById('city-modal');
+
+if(isOpen){
+modal.style.display='flex';
+}else{
+modal.style.display='none';
+}
+}
+
+function filterCities(){
+const input=document.getElementById('city-search').value.toLowerCase();
+const cities=document.getElementsByClassName('city-item');
+
+for(let city of cities){
+city.style.display=city.innerText.toLowerCase().includes(input)?"block":"none";
+}
+}
+
+async function detectLocation(){
+
+const btn=document.getElementById('detect-btn-el');
+
+btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Detecting...';
+btn.disabled=true;
+
+navigator.geolocation.getCurrentPosition(async(pos)=>{
+
+const {latitude,longitude}=pos.coords;
+
+const res=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+const data=await res.json();
+
+const city=data.city||data.locality||"Unknown";
+
+confirmLocation(city);
+
+});
+
+}
+
+async function confirmLocation(cityName){
+
+const res=await fetch(`${API_BASE}/api/profile/update`,{
+method:'PUT',
+headers:{
+'Authorization':`Bearer ${token}`,
+'Content-Type':'application/json'
+},
+body:JSON.stringify({location:cityName})
+});
+
+if(res.ok){
+document.getElementById('home-location-text').innerText=cityName;
+
+// ✅ ADD THIS LINE
+localStorage.setItem("userLocation", cityName);
+
+toggleLocationPopup(false);
+}
+
+}
+</script>
+
+</body>
+</html>
+
+

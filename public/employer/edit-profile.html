@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile | Advanced</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --card-bg: #121212;
+            --accent: #3b82f6; 
+            --text-gray: #94a3b8;
+            --border: #262626;
+            --glass: rgba(255, 255, 255, 0.03);
+        }
+
+        body { 
+            margin: 0; font-family: 'Inter', -apple-system, sans-serif; 
+            background-color: var(--bg-dark); color: white; 
+            display: flex; align-items: center; justify-content: center; min-height: 100vh;
+            padding: 20px; box-sizing: border-box;
+        }
+
+        .edit-card {
+            background: var(--card-bg); width: 100%; max-width: 550px;
+            border-radius: 24px; padding: 35px; border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h2 { font-size: 22px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; }
+
+        .photo-section { text-align: center; margin-bottom: 30px; position: relative; }
+        .photo-wrapper {
+            width: 120px; height: 120px; border-radius: 30px; margin: 0 auto 15px;
+            border: 2px solid var(--accent); padding: 5px; background: var(--glass);
+            position: relative; overflow: hidden;
+        }
+        #img-preview { width: 100%; height: 100%; object-fit: cover; border-radius: 22px; }
+        
+        .photo-controls { display: flex; justify-content: center; gap: 12px; }
+        .action-btn { 
+            background: var(--glass); color: white; border: 1px solid var(--border); 
+            padding: 10px 18px; border-radius: 12px; cursor: pointer; font-size: 13px;
+            font-weight: 600; display: flex; align-items: center; gap: 8px; transition: 0.2s;
+        }
+        .action-btn:hover { background: #1a1a1a; border-color: var(--accent); }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .full { grid-column: span 2; }
+        .input-box { display: flex; flex-direction: column; gap: 8px; }
+        label { font-size: 11px; color: var(--text-gray); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; }
+        
+        input, textarea, select { 
+            background: #000; border: 1px solid var(--border); color: white;
+            padding: 14px; border-radius: 14px; font-size: 14px; outline: none; transition: 0.3s;
+        }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+        input[readonly] { color: #555; cursor: not-allowed; }
+
+        .skills-container { 
+            display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; 
+            padding: 15px; background: #080808; border-radius: 14px; border: 1px dashed var(--border);
+            min-height: 50px;
+        }
+        .skill-tag { 
+            padding: 8px 16px; border-radius: 25px; font-size: 12px; font-weight: 600;
+            background: var(--glass); border: 1px solid var(--border); cursor: pointer; transition: 0.2s;
+        }
+        .skill-tag.active { background: rgba(59, 130, 246, 0.15); border-color: var(--accent); color: var(--accent); }
+
+        .save-btn {
+            width: 100%; background: var(--accent); color: white; border: none;
+            padding: 18px; border-radius: 16px; font-weight: 700; font-size: 16px;
+            cursor: pointer; margin-top: 30px; transition: 0.3s;
+        }
+        .save-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .save-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
+
+        #status { text-align: center; font-size: 13px; margin-top: 15px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="edit-card">
+    <div class="header">
+        <h2 id="page-title"><i class="fas fa-magic"></i> Customise Profile</h2>
+        <button onclick="window.history.back()" style="background:none; border:none; color:white; cursor:pointer; font-size: 24px;">&times;</button>
+    </div>
+
+    <div class="photo-section">
+        <div class="photo-wrapper">
+            <img id="img-preview" src="https://via.placeholder.com/120" alt="Avatar">
+        </div>
+        <div class="photo-controls">
+            <button class="action-btn" onclick="document.getElementById('file-input').click()"><i class="fas fa-camera"></i> Change</button>
+            <button class="action-btn" onclick="removePhoto()" style="color: #ef4444;"><i class="fas fa-trash"></i> Remove</button>
+        </div>
+        <input type="file" id="file-input" hidden accept="image/*" onchange="preview(event)">
+    </div>
+
+    <div class="form-grid">
+        <div class="input-box full">
+            <label>Registered Email (Read-only)</label>
+            <input type="email" id="email" readonly>
+        </div>
+
+        <div class="input-box full">
+            <label id="name-label">Legal Name</label>
+            <input type="text" id="name" placeholder="Enter Full Name">
+        </div>
+        <div class="input-box">
+            <label>Primary Location</label>
+            <input type="text" id="location" placeholder="City, State">
+        </div>
+        <div class="input-box">
+            <label>Contact Number</label>
+            <input type="text" id="phone" placeholder="+91">
+        </div>
+        <div class="input-box full">
+            <label id="cat-label">Main Business Category</label>
+            <select id="category" onchange="renderSkills()"></select>
+        </div>
+
+        <div class="input-box full" id="skills-section">
+            <label>Specific Expertise (Select Tags)</label>
+            <div class="skills-container" id="skills-list"></div>
+        </div>
+
+        <div class="input-box full">
+            <label>Professional Bio</label>
+            <textarea id="bio" rows="4" placeholder="Tell your story..."></textarea>
+        </div>
+    </div>
+
+    <button class="save-btn" id="save-btn" onclick="updateProfile()">Update Profile</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    const API = "http://127.0.0.1:5000"; 
+    let selectedFile = null;
+    let selectedSkills = new Set();
+    let isInitialLoad = true; // Guard to prevent resetting skills on first load
+
+    const workerSkills = {
+        "General Labour": ["Loading", "Cleaning", "Construction", "Helper"],
+        "Skilled": ["Electrician", "Plumber", "Carpenter", "Welder"],
+        "Delivery": ["Bike", "Heavy Vehicle", "Parcel Sort"]
+    };
+
+    const empCats = ["Retail", "Logistics", "Construction", "Healthcare", "Tech"];
+
+    function preview(e) {
+        const file = e.target.files[0];
+        if (file) { selectedFile = file; document.getElementById('img-preview').src = URL.createObjectURL(file); }
+    }
+
+    function removePhoto() {
+        selectedFile = null; document.getElementById('img-preview').src = 'https://via.placeholder.com/120';
+    }
+
+    // FIXED: Render Skills with Persistence
+    function renderSkills() {
+        const cat = document.getElementById('category').value;
+        const list = document.getElementById('skills-list');
+        list.innerHTML = "";
+        
+        // Only clear selections if the user manually changes the category after the page has loaded
+        if (!isInitialLoad) {
+            selectedSkills.clear();
+        }
+
+        if (workerSkills[cat]) {
+            workerSkills[cat].forEach(s => {
+                const tag = document.createElement('div');
+                tag.className = `skill-tag ${selectedSkills.has(s) ? 'active' : ''}`;
+                tag.innerText = s;
+                tag.onclick = () => {
+                    tag.classList.toggle('active');
+                    if (selectedSkills.has(s)) {
+                        selectedSkills.delete(s);
+                    } else {
+                        selectedSkills.add(s);
+                    }
+                };
+                list.appendChild(tag);
+            });
+        } else {
+            list.innerHTML = `<p style="font-size:11px; color:#444;">Select a category to view skills...</p>`;
+        }
+    }
+
+    async function init() {
+        const token = localStorage.getItem('token');
+        if (!token) return window.location.href = "login.html";
+
+        try {
+            const res = await fetch(`${API}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const user = await res.json();
+            
+            if (res.ok) {
+                const isEmp = user.role === 'employer';
+                document.getElementById('page-title').innerHTML = isEmp ? '<i class="fas fa-building"></i> Business Config' : '<i class="fas fa-user-edit"></i> Talent Profile';
+                document.getElementById('skills-section').style.display = isEmp ? 'none' : 'block';
+                
+                // FIXED: Mapping Email
+                document.getElementById('email').value = user.email || "";
+
+                const catSel = document.getElementById('category');
+                catSel.innerHTML = '<option value="">-- Choose Category --</option>';
+                const list = isEmp ? empCats : Object.keys(workerSkills);
+                list.forEach(c => catSel.innerHTML += `<option value="${c}">${c}</option>`);
+
+                document.getElementById('name').value = user.companyName || user.username || "";
+                document.getElementById('location').value = user.location || "";
+                document.getElementById('phone').value = user.phone || "";
+                document.getElementById('bio').value = user.bio || "";
+                catSel.value = user.category || user.mainCategory || "";
+
+                // FIXED: Skills Array Parsing
+                if (!isEmp) {
+                    try {
+                        let saved = [];
+                        if (typeof user.profession === 'string') {
+                            saved = JSON.parse(user.profession || "[]");
+                        } else if (Array.isArray(user.profession)) {
+                            saved = user.profession;
+                        }
+                        saved.forEach(s => selectedSkills.add(s));
+                    } catch(e) { console.error("Skill parse error", e); }
+                    
+                    renderSkills();
+                }
+
+                if (user.profilePicture) document.getElementById('img-preview').src = API + user.profilePicture;
+                
+                // Initial load complete
+                isInitialLoad = false;
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function updateProfile() {
+        const btn = document.getElementById('save-btn');
+        const status = document.getElementById('status');
+        btn.disabled = true;
+        status.innerText = "Syncing with cloud...";
+
+        const fd = new FormData();
+        const cat = document.getElementById('category').value;
+        fd.append('username', document.getElementById('name').value);
+        fd.append('companyName', document.getElementById('name').value);
+        fd.append('location', document.getElementById('location').value);
+        fd.append('phone', document.getElementById('phone').value);
+        fd.append('mainCategory', cat);
+        fd.append('category', cat);
+        fd.append('profession', JSON.stringify(Array.from(selectedSkills)));
+        fd.append('bio', document.getElementById('bio').value);
+        if (selectedFile) fd.append('profilePicture', selectedFile);
+
+        try {
+            const res = await fetch(`${API}/api/profile/update`, {
+                method: 'PUT', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: fd
+            });
+
+            if (res.ok) {
+                status.innerHTML = "✅ Profile Transformed Successfully!";
+                setTimeout(() => window.location.href = "profile.html", 800);
+            } else {
+                status.innerHTML = "❌ Transformation Failed.";
+                btn.disabled = false;
+            }
+        } catch (err) {
+            status.innerHTML = "❌ Network error.";
+            btn.disabled = false;
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>

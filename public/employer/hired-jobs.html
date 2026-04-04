@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hired / Jobs / Requests</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    :root{
+        --bg:#000;
+        --card:#111;
+        --border:#222;
+        --text:#c9d1d9;
+        --accent:#0095f6;
+    }
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:white;padding:15px;}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:15px;}
+    header button{background:#1a1a1a;border:1px solid var(--border);color:white;padding:8px 12px;border-radius:10px;cursor:pointer;}
+    .tabs{display:flex;gap:10px;margin:10px 0 15px;}
+    .tab{flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--border);background:#0d0d0d;color:var(--text);cursor:pointer;font-weight:600;}
+    .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+    .search-box{background:#0f0f0f;border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+    .search-box input{background:transparent;border:none;color:white;outline:none;width:100%;}
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;}
+    .panel h3{margin:0 0 10px 0;font-size:15px;color:var(--accent);}
+    .list{display:flex;flex-direction:column;gap:10px;}
+    .card{background:#0d0d0d;border:1px solid var(--border);border-radius:12px;padding:12px;}
+    .card h4{margin:0 0 4px 0;color:white;}
+    .muted{color:var(--text);font-size:12px;margin:2px 0;}
+    .pill{display:inline-block;padding:4px 8px;border-radius:10px;font-size:11px;border:1px solid #333;color:white;}
+    .pill.open{background:#113c1c;color:#6ee7b7;}
+    .pill.closed{background:#3a0f0f;color:#fca5a5;}
+    .pill.draft{background:#1f2937;color:#93c5fd;}
+    .empty{color:#666;text-align:center;margin:10px 0;}
+    .row-actions{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;}
+    .btn-primary{background:#1d4ed8;color:white;border:none;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;}
+    .btn-ghost{background:transparent;color:#cbd5e1;border:1px solid #2f3341;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;}
+    .avatar{width:42px;height:42px;border-radius:50%;background:#111;display:flex;align-items:center;justify-content:center;font-weight:800;color:#60a5fa;overflow:hidden;margin-right:10px;}
+    .avatar img{width:100%;height:100%;object-fit:cover;}
+    .card-flex{display:flex;align-items:center;}
+    .card-body{flex:1;}
+    #job-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.86);display:none;align-items:center;justify-content:center;z-index:3000;}
+    .job-box{background:#0f0f0f;border:1px solid #222;border-radius:14px;padding:18px;width:90%;max-width:480px;color:#e5e7eb;box-shadow:0 18px 60px rgba(0,0,0,0.55);}
+    .job-box h3{margin:0 0 8px 0;}
+    .job-box p{margin:6px 0;font-size:14px;color:#cbd5e1;}
+    .close-btn{background:#ef4444;border:none;color:white;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer;margin-top:10px;width:100%;}
+</style>
+</head>
+<body>
+<header>
+    <button onclick="history.back()"><i class="fas fa-arrow-left"></i></button>
+    <h2 style="margin:0;font-size:18px;">Manage</h2>
+</header>
+
+<div class="tabs">
+    <div class="tab active" id="tab-jobs" onclick="switchTab('jobs')">Posted Jobs <span id="count-jobs"></span></div>
+    <div class="tab" id="tab-hired" onclick="switchTab('hired')">Hired Workers <span id="count-hired"></span></div>
+    <div class="tab" id="tab-requests" onclick="switchTab('requests')">Requests <span id="count-req"></span></div>
+</div>
+
+<div class="search-box">
+    <i class="fas fa-search" style="color:#666;"></i>
+    <input id="search-input" placeholder="Search" oninput="renderCurrent()" />
+</div>
+
+<div class="panel">
+    <h3 id="panel-title">Posted Jobs</h3>
+    <div id="generic-list" class="list"><p class="empty">Loading...</p></div>
+</div>
+
+<script>
+const API_BASE="http://localhost:5000";
+const token=localStorage.getItem('token');
+let jobs=[], hired=[], requests=[], currentTab='jobs';
+
+function switchTab(tab){
+    currentTab=tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.getElementById('panel-title').innerText = tab==='jobs'?'Posted Jobs': tab==='hired'?'Hired Workers':'Requests';
+    renderCurrent();
+}
+
+function renderCurrent(){
+    const list=document.getElementById('generic-list');
+    const q=document.getElementById('search-input').value.toLowerCase();
+    let data=[];
+    if(currentTab==='jobs'){
+        data = jobs.filter(j=>!q || j.title?.toLowerCase().includes(q) || (j.location||'').toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(j=>{
+            const loc = j.location || j.employerId?.location || 'Location not set';
+            const pay = j.totalFee ? `₹${j.totalFee}` : (j.hourlyFee ? `₹${j.hourlyFee}/hr` : 'Budget not set');
+            const badge = j.status || 'open';
+            const date = j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '';
+            return `<div class="card">
+                <h4>${j.title}</h4>
+                <div class="muted">📍 ${loc}</div>
+                <div class="muted">💰 ${pay}</div>
+                <div class="muted">📅 ${date}</div>
+                <span class="pill ${badge}">${badge}</span>
+            </div>`;
+        }).join('') : '<p class="empty">No posted jobs.</p>';
+    }else if(currentTab==='hired'){
+        data = hired.filter(w=>!q || w.username?.toLowerCase().includes(q) || (w.location||'').toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(w=>`
+            <div class="card card-flex">
+                <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
+                <div class="card-body">
+                  <h4>${w.username || 'Worker'}</h4>
+                  <div class="muted">📍 ${w.location || 'Location not set'}</div>
+                  <div class="muted">Role: ${w.role || 'worker'}</div>
+                  <div class="row-actions">
+                    <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
+                    <button class="btn-ghost" onclick="removeFollower('${w._id}')">Remove</button>
+                  </div>
+                </div>
+            </div>
+        `).join('') : '<p class="empty">No hired workers.</p>';
+    }else{
+        data = requests.filter(w=>!q || w.username?.toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(w=>`
+            <div class="card card-flex">
+                <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
+                <div class="card-body">
+                  <h4>${w.username || 'Worker'}</h4>
+                  <div class="muted">📍 ${w.location || 'Location not set'}</div>
+                  <div class="muted">Role: ${w.role || 'worker'}</div>
+                  <div class="row-actions">
+                    <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
+                    <button class="btn-ghost" onclick="removeRequest('${w._id}')">Remove</button>
+                  </div>
+                </div>
+            </div>
+        `).join('') : '<p class="empty">No requests.</p>';
+    }
+}
+
+async function loadAll(){
+    if(!token) return window.location.href='../login.html';
+    // jobs
+    try{
+        const jr=await fetch(`${API_BASE}/api/jobs/mine`,{headers:{'Authorization':`Bearer ${token}`}});
+        jobs = jr.ok ? await jr.json() : [];
+        document.getElementById('count-jobs').innerText = `(${jobs.length})`;
+    }catch(e){jobs=[];}
+    // me
+    let me=null;
+    try{
+        const r=await fetch(`${API_BASE}/api/auth/me`,{headers:{'Authorization':`Bearer ${token}`}});
+        if(r.ok) me=await r.json();
+    }catch(e){}
+    // hired from followers
+    if(me){
+        const ids=me.followers||[];
+        hired = (await Promise.all(ids.map(async id=>{
+            try{
+                const r=await fetch(`${API_BASE}/api/users/profile/${id}`,{headers:{'Authorization':`Bearer ${token}`}});
+                return r.ok?await r.json():null;
+            }catch{return null;}
+        }))).filter(Boolean);
+    }
+    document.getElementById('count-hired').innerText = `(${hired.length})`;
+    // requests
+    try{
+        const rr=await fetch(`${API_BASE}/api/users/requests`,{headers:{'Authorization':`Bearer ${token}`}});
+        requests = rr.ok ? await rr.json() : [];
+    }catch(e){requests=[];}
+    document.getElementById('count-req').innerText = `(${requests.length})`;
+    renderCurrent();
+}
+
+window.onload=loadAll;
+
+function viewProfile(id,role){
+    if(role==='worker') window.location.href=`../worker/profile.html?id=${id}`;
+    else window.location.href=`profile.html?id=${id}`;
+}
+
+async function removeFollower(id){
+    try{
+        const res=await fetch(`${API_BASE}/api/profile/followers/${id}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
+        if(res.ok){
+            hired = hired.filter(w=>w._id!==id);
+            document.getElementById('count-hired').innerText = `(${hired.length})`;
+            renderCurrent();
+        }
+    }catch(e){}
+}
+
+async function removeRequest(id){
+    try{
+        const res=await fetch(`${API_BASE}/api/users/requests/${id}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
+        if(res.ok){
+            requests = requests.filter(w=>w._id!==id);
+            document.getElementById('count-req').innerText = `(${requests.length})`;
+            renderCurrent();
+        }
+    }catch(e){}
+}
+
+// Override renderCurrent with action buttons and job detail modal
+function renderCurrent(){
+    const list=document.getElementById('generic-list');
+    const q=document.getElementById('search-input').value.toLowerCase();
+    let data=[];
+    if(currentTab==='jobs'){
+        data = jobs.filter(j=>!q || j.title?.toLowerCase().includes(q) || (j.location||'').toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(j=>{
+            const loc = j.location || j.employerId?.location || 'Location not set';
+            const pay = j.totalFee ? `₹${j.totalFee}` : (j.hourlyFee ? `₹${j.hourlyFee}/hr` : 'Budget not set');
+            const badge = j.status || 'open';
+            const date = j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '';
+            return `<div class="card">
+                <h4>${j.title}</h4>
+                <div class="muted">Location: ${loc}</div>
+                <div class="muted">Pay: ${pay}</div>
+                <div class="muted">Date: ${date}</div>
+                <div class="row-actions">
+                  <button class="btn-primary" onclick='openJobDetails(${JSON.stringify(j).replace(/'/g,"&#39;")})'>Open</button>
+                  <span class="pill ${badge}">${badge}</span>
+                </div>
+            </div>`;
+        }).join('') : '<p class="empty">No posted jobs.</p>';
+    }else if(currentTab==='hired'){
+        data = hired.filter(w=>!q || w.username?.toLowerCase().includes(q) || (w.location||'').toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(w=>`
+            <div class="card card-flex">
+                <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
+                <div class="card-body">
+                  <h4>${w.username || 'Worker'}</h4>
+                  <div class="muted">Location: ${w.location || 'Location not set'}</div>
+                  <div class="muted">Role: ${w.role || 'worker'}</div>
+                  <div class="row-actions">
+                    <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
+                    <button class="btn-ghost" onclick="removeFollower('${w._id}')">Remove</button>
+                  </div>
+                </div>
+            </div>
+        `).join('') : '<p class="empty">No hired workers.</p>';
+    }else{
+        data = requests.filter(w=>!q || w.username?.toLowerCase().includes(q));
+        list.innerHTML = data.length ? data.map(w=>`
+            <div class="card card-flex">
+                <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
+                <div class="card-body">
+                  <h4>${w.username || 'Worker'}</h4>
+                  <div class="muted">Location: ${w.location || 'Location not set'}</div>
+                  <div class="muted">Role: ${w.role || 'worker'}</div>
+                  <div class="row-actions">
+                    <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
+                    <button class="btn-ghost" onclick="removeRequest('${w._id}')">Remove</button>
+                  </div>
+                </div>
+            </div>
+        `).join('') : '<p class="empty">No requests.</p>';
+    }
+}
+
+function openJobDetails(job){
+    const box=document.getElementById('job-modal');
+    const container=document.getElementById('job-modal-content');
+    const loc = job.location || job.employerId?.location || 'Location not set';
+    const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : 'Budget not set');
+    container.innerHTML=`
+      <h3>${job.title||'Job'}</h3>
+      <p><strong>Location:</strong> ${loc}</p>
+      <p><strong>Pay:</strong> ${pay}</p>
+      <p><strong>Details:</strong> ${job.details || job.workDetails || 'Not provided'}</p>
+      <p><strong>Tasks:</strong> ${job.tasks || 'Not provided'}</p>
+      <button class="close-btn" onclick="closeJobDetails()">Close</button>
+    `;
+    box.style.display='flex';
+}
+function closeJobDetails(){
+    document.getElementById('job-modal').style.display='none';
+}
+</script>
+<div id="job-modal">
+  <div class="job-box" id="job-modal-content"></div>
+</div>
+</body>
+</html>

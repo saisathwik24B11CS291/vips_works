@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPs | Sign Up</title>
+    <link rel="stylesheet" href="../styles.css"> 
+    <script src="/src/signup.js" defer></script>
+    
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --vip-gold: #fbbf24;
+            --text-dark: #0f172a;
+            --text-light: #64748b;
+            --white: #ffffff;
+            --error: #ef4444;
+            --success: #10b981;
+            --input-bg: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .signup-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--white);
+            padding: 40px;
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        .brand-logo {
+            text-align: center;
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 5px;
+            letter-spacing: -3px;
+            background: linear-gradient(135deg, var(--primary), var(--vip-gold));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            font-style: italic;
+        }
+
+        h2 {
+            text-align: center;
+            color: var(--text-dark);
+            font-size: 1.4rem;
+            margin-top: 0;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: var(--text-dark);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background: var(--input-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            background: var(--white);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        .input-wrapper input {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            font-size: 0.95rem;
+            outline: none;
+            color: var(--text-dark);
+            width: 100%;
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            border-left: 1px solid var(--border-color);
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 0.65rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            padding: 0 12px;
+            height: 20px;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--text-dark);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button[type="submit"]:hover {
+            background-color: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        button[type="submit"]:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #message {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            min-height: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="signup-card">
+        <div class="brand-logo">VIPs</div>
+        <h2>Create Account</h2>
+
+        <form id="signup-form">
+            <div class="form-group">
+                <label for="signup-username">Username</label>
+                <div class="input-wrapper">
+                    <input type="text" id="signup-username" placeholder="Choose a username" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <div class="input-wrapper">
+                    <input type="email" id="email" placeholder="email@example.com" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <div class="input-wrapper">
+                    <input type="tel" id="phone" placeholder="Your phone number" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="signup-password">Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="signup-password" placeholder="Create a password" required>
+                    <button type="button" class="toggle-btn" id="toggle-btn">Show</button>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn">Register Account</button>
+        </form>
+
+        <p id="message"></p>
+
+        <p class="footer">
+            Already have an account? <a href="login.html">Login here</a>
+        </p>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const signupForm = document.getElementById('signup-form');
+        const messagePara = document.getElementById('message');
+        const submitBtn = document.getElementById('submit-btn');
+        const pwInput = document.getElementById('signup-password');
+        const toggleBtn = document.getElementById('toggle-btn');
+
+        // Password Toggle Logic
+        toggleBtn.addEventListener('click', () => {
+            const isPw = pwInput.type === 'password';
+            pwInput.type = isPw ? 'text' : 'password';
+            toggleBtn.innerText = isPw ? 'Hide' : 'Show';
+        });
+
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+
+            // Disable button and show processing state
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Creating Account...";
+            messagePara.innerText = "";
+
+            // 1. Get the role saved from index.html (default to 'worker' if missing)
+            const role = localStorage.getItem('userRole') || 'worker';
+
+            // 2. Match IDs exactly to the inputs
+            const username = document.getElementById('signup-username').value;
+            const email = document.getElementById('email').value;
+            const password = pwInput.value;
+            const phone = document.getElementById('phone').value;
+
+            try {
+                // 3. Connect to your server
+                const response = await fetch('http://localhost:5000/api/auth/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role, username, email, password, phone })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messagePara.style.color = "var(--success)";
+                    messagePara.innerText = `Success! Registered as ${role}. Redirecting...`;
+                    setTimeout(() => {
+                        window.location.href = "login.html";
+                    }, 2000);
+                } else {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Register Account";
+                    messagePara.style.color = "var(--error)";
+                    messagePara.innerText = "Error: " + (data.error || data.message);
+                }
+            } catch (err) {
+                console.error("Signup error:", err);
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Register Account";
+                messagePara.style.color = "var(--error)";
+                messagePara.innerText = "Server connection failed. Is port 5000 running?";
+            }
+        });
+    });
+    </script>
+</body>
+</html>

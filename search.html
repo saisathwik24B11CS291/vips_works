@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPs | Discover</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #000; color: white; margin: 0; padding-bottom: 80px; }
+        .search-header { padding: 15px; position: sticky; top: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); z-index: 100; }
+        .search-bar { background: #262626; border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; gap: 10px; border: 1px solid #333;}
+        input { background: transparent; border: none; color: white; font-size: 16px; width: 100%; outline: none; }
+        .results-list { padding: 10px 15px; }
+        .user-card { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #121212; border-radius: 15px; margin-bottom: 10px; cursor: pointer; border: 1px solid #1c1c1c; }
+        .card-left { display: flex; align-items: center; flex: 1; }
+        .user-pic-wrapper { position: relative; margin-right: 15px; }
+        .user-pic { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; background: #333; border: 2px solid #262626; }
+        .status-dot { width: 12px; height: 12px; background: #10b981; border: 2px solid #000; position: absolute; bottom: 2px; right: 2px; border-radius: 50%; }
+        .user-info b { display: block; font-size: 15px; color: #fff; }
+        .user-info span { color: #94a3b8; font-size: 12px; display: block; margin-top: 2px; }
+        .role-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 4px; text-transform: uppercase; }
+        .tag-worker { background: #3b82f6; color: white; }
+        .tag-employer { background: #fbbf24; color: black; }
+        .btn-action { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: 0.2s; }
+        .follow-btn { background: #fff; color: #000; }
+        .msg-btn { background: #262626; color: #fff; border: 1px solid #444; }
+        .requested-btn { background: #444; color: #888; cursor: default; }
+        .feed-title { padding: 15px; font-size: 18px; font-weight: bold; border-top: 1px solid #262626; }
+        .post-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+        .grid-item { background: #121212; position: relative; overflow:hidden; border-radius:8px; }
+        .grid-item.small{ grid-row: span 1; grid-column: span 1; aspect-ratio:1/1;}
+        .grid-item.tall{ grid-row: span 2; grid-column: span 1; aspect-ratio:2/1;}
+        .grid-item.wide{ grid-row: span 1; grid-column: span 2; aspect-ratio:1/2;}
+        .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; display:block; }
+        .badge{position:absolute;bottom:8px;left:8px;padding:4px 8px;border-radius:10px;background:rgba(0,0,0,0.6);font-size:12px;}
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
+            background: #000; border-top: 1px solid #262626;
+            display: flex; justify-content: space-around; align-items: center; z-index: 1000;
+        }
+        .nav-item { color: #737373; text-decoration: none; display: flex; flex-direction: column; align-items: center; width: 25%; }
+        .nav-item.active { color: #ffffff; }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 4px; }
+        /* Standard Follow Button */
+.follow-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+/* Following State (Gray/Darker) */
+.follow-btn.following {
+    background: #262626;
+    color: #efefef;
+    border: 1px solid #333;
+}
+
+/* Requested State (Yellow or Blue Border) */
+.follow-btn.requested {
+    background: transparent;
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+}
+    </style>
+</head>
+<body>
+
+<div class="search-header">
+    <div class="search-bar">
+        <span>🔍</span>
+        <input type="text" id="search-input" placeholder="Search workers, employers, posts..." oninput="handleSearch(this.value)">
+    </div>
+</div>
+
+<div id="results-container" class="results-list"></div>
+
+<div id="showcase-section">
+    <div class="feed-title">Explore Showcases</div>
+    <div class="post-grid" id="explore-grid"></div>
+</div>
+
+<div class="bottom-nav">
+    <a href="#" id="nav-home" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+    </a>
+    <a href="search.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="3"></line></svg>
+    </a>
+    <a href="#" id="nav-messages" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+    </a>
+    <a href="#" id="nav-profile" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    </a>
+</div>
+
+<script>
+    const API_BASE = "http://localhost:5000";
+const token = localStorage.getItem('token');
+const userRole = localStorage.getItem('userRole'); 
+let myRole = userRole || ""; // cache current role so we can gate employer->employer visibility
+let myLocation = localStorage.getItem("userLocation") || "";
+let myGeo = { city:"", state:"", country:"" };
+let exploreItems = [];
+let followingIds = new Set();
+let myId="";
+let currentTile=null;
+let currentIdx=0;
+
+function setupNavigation() {
+    if (!userRole) return;
+    const roleFolder = userRole === 'employer' ? 'employer' : 'worker';
+    document.getElementById('nav-home').href = `/${roleFolder}/home.html`;
+    document.getElementById('nav-messages').href = `/${roleFolder}/messages.html`;
+    document.getElementById('nav-profile').href = `/${roleFolder}/profile.html`;
+}
+setupNavigation();
+// quick decode id from token to hide own posts even before /me returns
+try{ myId = JSON.parse(atob(token.split('.')[1])).id || ""; }catch(e){}
+detectGeo(); // try to get richer location for ranking
+loadExplore(); // preload explore feed
+
+async function detectGeo(){
+    try{
+        await new Promise((resolve,reject)=>{
+            navigator.geolocation.getCurrentPosition(async(pos)=>{
+                try{
+                    const {latitude,longitude}=pos.coords;
+                    const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+                    const data = await r.json();
+                    myGeo.city = data.city || data.locality || "";
+                    myGeo.state = data.principalSubdivision || "";
+                    myGeo.country = data.countryName || "";
+                    if(data.city) localStorage.setItem("userLocation", data.city);
+                    resolve();
+                }catch(e){reject(e);}
+            },reject,{timeout:5000});
+        });
+    }catch(e){}
+}
+
+async function handleSearch(query) {
+    const container = document.getElementById('results-container');
+    const showcase = document.getElementById('showcase-section');
+    
+    if (!query.trim()) {
+        container.innerHTML = '';
+        renderExplore();
+        showcase.style.display = 'block';
+        return;
+    }
+    showcase.style.display = 'none';
+
+    try {
+        const res = await fetch(`${API_BASE}/api/users/search?q=${query}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const users = await res.json();
+
+        // Get my own ID to avoid showing follow button on my own card
+        const meRes = await fetch(`${API_BASE}/api/auth/me`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const me = await meRes.json();
+        myId = me._id;
+        myRole = me.role || myRole;
+        myLocation = myLocation || me.location || "";
+        followingIds = new Set((me.following||[]).map(String));
+
+        // Employers should never see other employers in search results
+        const visibleUsers = (users || []).filter(u => !(myRole === 'employer' && u.role === 'employer'));
+
+        if (visibleUsers.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:gray; margin-top:20px;">No results found</p>';
+            return;
+        }
+
+        const sorted = visibleUsers
+          .filter(u=>u._id!==myId)
+          .map(u=>({...u, _score: locationScore(u.location)}))
+          .sort((a,b)=> b._score - a._score);
+
+        container.innerHTML = sorted.map(user => {
+            // Check relationship status
+            // Note: Ensure your backend search API returns these arrays or use .some()
+            const isFollowing = (user.followers || []).includes(myId);
+            const isRequested = (user.followRequests || []).includes(myId);
+            const isTargetEmployer = user.role === 'employer';
+            
+            let displaySub = isTargetEmployer 
+                ? (user.companyName || "Business Employer") 
+                : (user.profession ? user.profession[0] : "Worker");
+
+            // --- ACTION BUTTON LOGIC ---
+            let actionBtn = '';
+            
+            // Employers should not follow workers; no action for employer role
+            if (myRole === 'worker' && isTargetEmployer) {
+                if (isFollowing) {
+                    actionBtn = `<button class="btn-action follow-btn following" onclick="followUser('${user._id}', this)">Following</button>`;
+                } else if (isRequested) {
+                    actionBtn = `<button class="btn-action follow-btn requested" onclick="followUser('${user._id}', this)">Requested</button>`;
+                } else {
+                    actionBtn = `<button class="btn-action follow-btn" onclick="followUser('${user._id}', this)">Follow</button>`;
+                }
+            } else if (myRole === 'worker' && isFollowing) {
+                // If already following, show message option regardless of role
+                actionBtn = `<button class="btn-action msg-btn" onclick="window.location.href='chat.html?id=${user._id}'">Message</button>`;
+            }
+
+            return `
+                <div class="user-card">
+                    <div class="card-left" onclick="window.location.href='/friendProfile.html?id=${user._id}'">
+                        <div class="user-pic-wrapper">
+                            <img src="${user.profilePicture ? API_BASE + user.profilePicture : 'https://via.placeholder.com/50'}" class="user-pic">
+                            ${user.isOnline ? '<div class="status-dot"></div>' : ''}
+                        </div>
+                        <div class="user-info">
+                            <b>${user.username}</b>
+                            <span>${displaySub}</span>
+                            <span class="role-tag ${isTargetEmployer ? 'tag-employer' : 'tag-worker'}">${user.role}</span>
+                        </div>
+                    </div>
+                    <div class="card-right">${actionBtn}</div>
+                </div>`;
+        }).join('');
+    } catch (err) { 
+        console.error("Search error:", err); 
+    }
+}
+
+// THE MAIN FOLLOW FUNCTION
+async function followUser(targetId, buttonElement) {
+    // Prevent the card's click event from firing when clicking the button
+    event.stopPropagation(); 
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/users/follow/${targetId}`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await res.json();
+
+        // Dynamically update the button without refreshing the page
+        // Inside followUser function after const data = await res.json();
+        if (data.status === "following") {
+            buttonElement.innerText = "Following";
+            buttonElement.className = "btn-action follow-btn following";
+        } else if (data.status === "requested") {
+            buttonElement.innerText = "Requested";
+            buttonElement.className = "btn-action follow-btn requested";
+        } else if (data.status === "unfollowed" || data.status === "cancelled") {
+            // ADD THIS ELSE IF
+            buttonElement.innerText = "Follow";
+            buttonElement.className = "btn-action follow-btn";
+        }
+
+    } catch (err) {
+        console.error("Follow failed:", err);
+    }
+}
+
+function locationScore(loc){
+    if(!loc) return 0;
+    const lc=loc.toLowerCase();
+    const city=myGeo.city?.toLowerCase()||"";
+    const state=myGeo.state?.toLowerCase()||"";
+    const stored=(myLocation||"").toLowerCase();
+    if(city && lc.includes(city)) return 100;
+    if(stored && lc.includes(stored)) return 90;
+    if(state && lc.includes(state)) return 70;
+    return 10; // fallback
+}
+
+// -------- Explore feed (portfolio) ----------
+async function loadExplore(){
+    try{
+        // fetch self to get following list for private employers and hide own posts
+        try{
+            const meRes = await fetch(`${API_BASE}/api/auth/me`,{headers:{'Authorization':`Bearer ${token}`}});
+            if(meRes.ok){
+                const me = await meRes.json();
+                myId = me._id || myId;
+                myRole = me.role || myRole;
+                myLocation = myLocation || me.location || "";
+                followingIds = new Set((me.following||[]).map(String));
+            }
+        }catch(e){}
+
+        const res=await fetch(`${API_BASE}/api/explore/portfolio`,{headers:{'Authorization':`Bearer ${token}`}});
+        exploreItems = res.ok ? await res.json() : [];
+        renderExplore();
+    }catch(e){
+        document.getElementById('explore-grid').innerHTML = '<div style="padding:12px;color:#888;">Failed to load explore.</div>';
+    }
+}
+
+function renderExplore(){
+    const grid=document.getElementById('explore-grid');
+    if(!grid) return;
+    if(!exploreItems.length){
+        grid.innerHTML = '<p style="color:#666;">No showcases yet.</p>';
+        return;
+    }
+    const scored = exploreItems
+      .filter(it=>{
+        if (myRole === 'employer' && it.role === 'employer') return false; // no employer-to-employer exposure
+        return !isLocked(it) && String(it.ownerId)!==String(myId);
+      })
+      .map(item=>({...item, _score: locationScore(item.location)}))
+      .sort((a,b)=> b._score - a._score);
+    if (!scored.length){
+        grid.innerHTML = '<p style="color:#666;">No showcases yet.</p>';
+        return;
+    }
+    const spans=['small','tall','wide'];
+    grid.innerHTML = scored.map((it,idx)=>{
+        const media = it.media
+          ? (it.media.type==='video'
+                ? `<video src="${API_BASE}${it.media.url}" muted></video>`
+                : `<img src="${API_BASE}${it.media.url}" onerror="this.src='https://via.placeholder.com/200'>`)
+          : `<div style="background:#111;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#666;">No media</div>`;
+        const span = spans[idx % spans.length];
+        return `<div class="grid-item ${span}" data-idx="${idx}" onclick="openTile(${idx})">
+            ${media}
+            <div class="badge">${it.ownerName||'User'}</div>
+          </div>`;
+    }).join('');
+}
+
+function isLocked(item){
+    if(item.role!=='employer') return false;
+    const followToView = item.settings?.followToView === true;
+    if(!followToView) return false;
+    return !followingIds.has(String(item.ownerId));
+}
+
+// Portfolio viewer modal
+function openTile(idx){
+    const tiles = exploreItems
+      .filter(it=>{
+        if (myRole === 'employer' && it.role === 'employer') return false;
+        return !isLocked(it) && String(it.ownerId)!==String(myId);
+      })
+      .map(item=>({...item, _score: locationScore(item.location)}))
+      .sort((a,b)=> b._score - a._score);
+    currentTile = tiles[idx];
+    if(!currentTile) return;
+    currentIdx = 0;
+    document.getElementById('viewer-username').innerText = currentTile.ownerName||'User';
+    document.getElementById('viewer-username').onclick = ()=>openProfile(currentTile);
+    renderViewerMedia();
+    document.getElementById('explore-viewer').style.display='flex';
+}
+function renderViewerMedia(){
+    const slot=document.getElementById('viewer-media');
+    slot.innerHTML='';
+    // add arrows first so they sit above any video controls
+    const leftBtn=document.createElement('button');
+    leftBtn.innerText='‹';
+    leftBtn.style.cssText="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:20px;width:38px;height:38px;border-radius:50%;cursor:pointer;z-index:5;";
+    leftBtn.onclick=()=>changeViewer(-1);
+    const rightBtn=document.createElement('button');
+    rightBtn.innerText='›';
+    rightBtn.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:20px;width:38px;height:38px;border-radius:50%;cursor:pointer;z-index:5;";
+    rightBtn.onclick=()=>changeViewer(1);
+    slot.appendChild(leftBtn);
+    slot.appendChild(rightBtn);
+
+    if(!currentTile || !currentTile.mediaList?.length){
+        const empty=document.createElement('div');
+        empty.style.cssText="color:#999;padding:20px;";
+        empty.innerText="No media";
+        slot.appendChild(empty);
+        return;
+    }
+    const m=currentTile.mediaList[currentIdx];
+    let el;
+    if(m.type==='video'){
+        el=document.createElement('video');
+        el.src=API_BASE + m.url;
+        el.controls=true;
+        el.style.pointerEvents="auto";
+    }else{
+        el=document.createElement('img');
+        el.src=API_BASE + m.url;
+        el.onerror=()=>{el.src='https://via.placeholder.com/400';};
+    }
+    el.style.cssText="width:100%;height:100%;object-fit:contain;border-radius:12px;";
+    // ensure arrows stay clickable over video controls
+    el.addEventListener('pointerdown',(e)=>{ e.stopPropagation(); });
+    slot.appendChild(el);
+    document.getElementById('viewer-dots').innerHTML=currentTile.mediaList.map((_,i)=>`<span style="width:8px;height:8px;border-radius:50%;display:inline-block;margin:0 4px;background:${i===currentIdx?'#fff':'#555'};"></span>`).join('');
+}
+function closeViewer(){ document.getElementById('explore-viewer').style.display='none'; }
+function changeViewer(step){
+    if(!currentTile || !currentTile.mediaList?.length) return;
+    currentIdx = (currentIdx + step + currentTile.mediaList.length) % currentTile.mediaList.length;
+    renderViewerMedia();
+}
+function openProfile(tile){
+    const base = tile.role==='employer' ? '/employer/profile.html' : '/worker/profile.html';
+    window.location.href = `${base}?id=${tile.ownerId}&project=${tile.projectId}`;
+}
+</script>
+</body>
+<div id="explore-viewer" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:4000;align-items:center;justify-content:center;">
+  <div style="width:92%;max-width:640px;background:#0f0f0f;border:1px solid #222;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <button onclick="closeViewer()" style="background:none;border:none;color:#888;cursor:pointer;font-size:20px;">✕</button>
+      <button id="viewer-username" style="background:none;border:none;color:#3b82f6;font-weight:800;cursor:pointer;"></button>
+    </div>
+    <div id="viewer-media" style="background:#000;border-radius:12px;min-height:320px;display:flex;align-items:center;justify-content:center;position:relative;">
+      <button onclick="changeViewer(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">‹</button>
+      <button onclick="changeViewer(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">›</button>
+    </div>
+    <div id="viewer-dots" style="text-align:center;"></div>
+  </div>
+</div>
+</html>
