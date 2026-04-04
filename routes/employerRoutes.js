@@ -5,7 +5,6 @@ const Employer = require('../models/Employer'); // Path check
 // Path check
 const multer = require('multer'); 
 const auth = require('./middleware/auth');
-const User = require('../models/User');
 
 // Configure Multer
 const upload = multer({ dest: 'uploads/projects/' });
