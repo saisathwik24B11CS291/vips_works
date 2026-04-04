@@ -492,7 +492,6 @@ app.post('/api/employer/update-privacy', authMiddleware, async (req, res) => {
         res.status(500).json({ error: "Update failed" });
     }
 });// This tells the server to look for HTML files in your main folder
-app.use(express.static(path.join(__dirname, '/'))); 
 // Add this to server.js
 app.get('/api/notifications/count', async (req, res) => {
     try {
@@ -511,11 +510,10 @@ app.get('/api/notifications/count', async (req, res) => {
         res.status(500).json({ message: "Error fetching notification count" });
     }
 });
-// If your other pages are in 'public', keep that too
+// Static file serving
+app.use('/uploads', express.static(uploadDir));
 app.use(express.static('public'));
-// Add these lines to your server.js middle-ware section
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname)); // This allows serving search.html from the root
+app.use(express.static(__dirname)); // This allows serving files from the root
 
 
 // --- UPDATE PROFILE ROUTE ---
