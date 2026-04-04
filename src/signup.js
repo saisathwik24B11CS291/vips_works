@@ -4,7 +4,7 @@ import './styles.css';
 document.addEventListener('DOMContentLoaded', () => {
     
     // 1. Use the full URL and port 5000 as defined in your server.js
-    const API_URL = 'http://localhost:5000/api/auth'; 
+    const API_URL = 'https://vips_works.onrender.com/api/auth'; 
     
     const signupForm = document.getElementById('signup-form');
     const messageElement = document.getElementById('message');
