@@ -2,7 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // Define the URL for your backend server
-    const BACKEND_URL = 'http://localhost:3001'; 
+    const BACKEND_URL = 'https://vips_works.onrender.com'; 
     
     // --- Get Elements ---
     const signupForm = document.getElementById('signup-form');

@@ -11,7 +11,7 @@
 <script>
     async function loadFollowing() {
         // Fetch only users that the current worker is following
-        const res = await fetch(`${API_BASE}/api/users/following`, {
+        const res = await fetch(`https://vips_works.onrender.com/api/users/following`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const employers = await res.json();
