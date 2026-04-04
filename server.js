@@ -172,7 +172,7 @@ app.get('/api/config/google-client', (req,res)=>{
 // --- STATIC FILES ---
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
+
 app.use('/uploads', express.static(uploadDir)); 
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1525,8 +1525,16 @@ app.use('/api/messages', messageRoutes);
 
 // --- START SERVER ---
 mongoose.connect(MONGODB_URI)
-    .then(() => {
-        console.log("✅ Database Connected Successfully");
-        app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));
-    })
-    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+  .then(() => {
+    console.log("✅ Database Connected Successfully");
+
+    // Routes after DB connection
+    app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
+    app.use('/api/workers', workerRoutes);
+    app.use('/api/employers', employerRoutes);
+
+    // Start server
+    const port = process.env.PORT || 5000;
+    app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+  })
+  .catch(err => console.error("❌ MongoDB Connection Error:", err));
