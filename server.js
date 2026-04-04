@@ -25,6 +25,9 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change_me_in_env') {
 
 
 // 2. In your authMiddleware
+app.get("/", (req, res) => {
+  res.send("VIPs Backend is Running 🚀");
+});
 
 
 // --- MODELS ---
@@ -1512,9 +1515,6 @@ res.json(jobs);
 console.error(err);
 res.status(500).json({error:"Server error"});
 }
-});
-app.get("/", (req, res) => {
-  res.send("VIPs Backend is Running 🚀");
 });
 
 // --- APPLY EXTERNAL ROUTES ---
