@@ -187,7 +187,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
 }));
 
-app.get(['/friendProfile.html', '/FriendProfile.html', '/Friendprofile.html', '/friendprofile.html'], (req, res) => {
+app.get(['../friendProfile.html', '../FriendProfile.html', '../Friendprofile.html', '../friendprofile.html'], (req, res) => {
     res.sendFile(path.join(__dirname, 'friendprofile.html'));
 });
 app.get(['/search.html', '/Search.html'], (req, res) => {

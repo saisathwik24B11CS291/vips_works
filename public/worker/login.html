@@ -256,21 +256,21 @@
             })
         });
 
-        // FIXED: Changed 'response' to 'res' to match the fetch above
         const data = await res.json();
 
         if (res.ok) {
-             if (data.role == 'employer') {
-                    alert("Access Denied: This account is not an worker.");
-                    return;
-                }
+            if (data.role === 'employer') {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Continue";
+                messagePara.style.color = "#ef4444";
+                messagePara.innerText = "This is an employer account. Please use the Employer login page.";
+                return;
+            }
 
-            // STORE DATA CORRECTLY
+            localStorage.clear();
             localStorage.setItem('token', data.token);
             localStorage.setItem('username', data.username);
             localStorage.setItem('userRole', data.role);
-            
-            // Save the ID for interlinking logic
             localStorage.setItem('userId', data.userId || (data.user && data.user._id));
 
             messagePara.style.color = "#10b981"; // Using standard hex for success
@@ -278,13 +278,11 @@
             
             setTimeout(() => {
                 if (data.role === 'employer') {
-                    // Redirect to employer dashboard if they somehow got here
-                    
                     messagePara.style.color = "#ef4444";
-                   messagePara.innerText = "no data is found?"; 
+                    messagePara.innerText = "This is an employer account. Please use the Employer login page.";
                 } else {
-                    // Redirect to worker profile
-                    window.location.href = "../worker/profile.html";
+                    // Redirect to worker profile without leaving login in history
+                    window.location.replace("../worker/profile.html");
                 }
             }, 1000);
         } else {

@@ -215,7 +215,24 @@
     <script>
         const API_BASE = window.location.origin;
         const token = localStorage.getItem('token');
+        const userRole = localStorage.getItem('userRole');
         const urlParams = new URLSearchParams(window.location.search);
+
+        function enforceEmployerAuth() {
+            const storedToken = localStorage.getItem('token');
+            const storedRole = localStorage.getItem('userRole');
+            if (!storedToken || storedRole !== 'employer') {
+                window.location.replace('login.html');
+            }
+        }
+
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted || !localStorage.getItem('token')) {
+                enforceEmployerAuth();
+            }
+        });
+
+        enforceEmployerAuth();
         const viewedUserId = urlParams.get('id');
         let currentProjects = [];
         let isOwnerView = true;
@@ -233,7 +250,7 @@
         };
 
         async function loadProfile() {
-            if (!token) return window.location.href = 'login.html';
+            if (!token) return window.location.replace('login.html');
             const myId = getMyData()?.id;
             const isVisitor = viewedUserId && viewedUserId !== myId;
 
@@ -592,7 +609,7 @@
             overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
         }
 
-        function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+        function logout() { localStorage.clear(); window.location.replace('login.html'); }
 
         async function loadJobCount(){
             try{

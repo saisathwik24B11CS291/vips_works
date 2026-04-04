@@ -15,7 +15,6 @@
         .input-group input { width: 100%; background: var(--card-bg); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; color: white; outline: none; box-sizing: border-box; }
         .login-btn { width: 100%; background: var(--accent-blue); color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     </style>
-    +
 </head>
 <body>
 
@@ -82,30 +81,24 @@
             const response = await fetch(window.location.origin + "/api/auth/login", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password, role: 'employer' })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                // Ensure we only allow the correct role to enter this dashboard
                 if (data.role !== 'employer') {
                     alert("Access Denied: This account is not an Employer.");
                     return;
                 }
 
-                // --- CRITICAL STORAGE ---
-                // Clear any old, broken tokens first
-                localStorage.clear(); 
-                
-                // Store the new token
+                localStorage.clear();
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('userRole', data.role);
-                // Standardize the ID storage
                 localStorage.setItem('userId', data.userId || data._id);
 
-                // Redirect to the home dashboard
-                window.location.href = 'home.html';
+                // Redirect to the home dashboard without leaving the login page in history
+                window.location.replace('home.html');
             } else {
                 alert(data.message || "Invalid Username or Password.");
             }

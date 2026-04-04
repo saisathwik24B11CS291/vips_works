@@ -537,11 +537,22 @@ loadPostedJobs();
 }
 
 window.onload = function () {
+    if (!token || localStorage.getItem('userRole') !== 'worker') {
+        window.location.replace('login.html');
+        return;
+    }
     loadUserLocation();
     showInvited();
     checkJobUpdates();
     setInterval(checkJobUpdates,30000);
 };
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted || !localStorage.getItem('token')) {
+        if (!localStorage.getItem('token') || localStorage.getItem('userRole') !== 'worker') {
+            window.location.replace('login.html');
+        }
+    }
+});
 console.log("TOKEN:", token);
 async function loadUserLocation(){
 
