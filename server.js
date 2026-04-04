@@ -153,7 +153,6 @@ app.use((req,res,next)=>{
     sanitize(req.query);
     next();
 });
-app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
 // health check
 app.get('/health', (req,res)=> res.json({status:'ok', time:new Date().toISOString()}));
 // expose Google client id to frontend (no secrets)
@@ -1516,6 +1515,11 @@ res.status(500).json({error:"Server error"});
 app.use('/api/users', workerRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/messages', messageRoutes);
+
+// --- SERVE INDEX.HTML FOR ROOT PATH ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // --- START SERVER ---
 const MONGODB_URI = process.env.MONGODB_URI;
