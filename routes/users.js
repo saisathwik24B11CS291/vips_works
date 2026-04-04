@@ -3,7 +3,7 @@ const router = express.Router();
 const User = require('../models/user'); // Primary Unified Model
 const Worker = require('../models/Worker'); 
 const Employer = require('../models/Employer');
-const auth = require('../middleware/auth');
+const auth = require('./middleware/auth');
 
 // --- 1. SEARCH LOGIC ---
 router.get('/search', auth, async (req, res) => {
