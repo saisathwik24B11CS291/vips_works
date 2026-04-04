@@ -168,9 +168,31 @@ app.get('/api/config/google-client', (req,res)=>{
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-app.use('/uploads', express.static(uploadDir)); 
-app.use(express.static('public'));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(uploadDir));
+
+app.use((req, res, next) => {
+    if (req.path.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+    }
+    next();
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+        }
+    }
+}));
+
+app.get(['/friendProfile.html', '/FriendProfile.html', '/Friendprofile.html', '/friendprofile.html'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'friendprofile.html'));
+});
+app.get(['/search.html', '/Search.html'], (req, res) => {
+    res.sendFile(path.join(__dirname, 'search.html'));
+});
 
 // --- ✅ MULTER CONFIGURATION (Fixes "upload is not defined") ---
 const storage = multer.diskStorage({
@@ -232,12 +254,19 @@ app.post('/api/auth/signup', async (req, res) => {
 // Unified Login Logic in server.js
 
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, role } = req.body;
     const SECRET = JWT_SECRET;
 
     try {
-        // Search both collections
-        let user = await Worker.findOne({ username }) || await Employer.findOne({ username });
+        // Prefer the requested role when available, then fallback to the other collection.
+        let user = null;
+        if (role === 'employer') {
+            user = await Employer.findOne({ username }) || await Worker.findOne({ username });
+        } else if (role === 'worker') {
+            user = await Worker.findOne({ username }) || await Employer.findOne({ username });
+        } else {
+            user = await Worker.findOne({ username }) || await Employer.findOne({ username });
+        }
         
         if (!user) {
             return res.status(400).json({ message: 'User not found' });
@@ -509,12 +538,6 @@ app.get('/api/notifications/count', async (req, res) => {
         res.status(500).json({ message: "Error fetching notification count" });
     }
 });
-// Static file serving
-app.use('/uploads', express.static(uploadDir));
-app.use(express.static('public'));
-app.use(express.static(__dirname)); // This allows serving files from the root
-
-
 // --- UPDATE PROFILE ROUTE ---
 app.put('/api/profile/update', (req, res, next) => {
     // 1. Handle potential file upload first
