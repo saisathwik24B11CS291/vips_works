@@ -963,7 +963,7 @@ app.post('/api/profile/heartbeat', async (req, res) => {
         res.sendStatus(200);
     } catch (err) { res.sendStatus(500); }
 });
-const Job = require('./models/Job');
+const Job = require('./models/job');
 
 app.post('/api/jobs/create', async (req, res) => {
     try {
