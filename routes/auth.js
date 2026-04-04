@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs'); // Use bcryptjs for better compatibility
 const jwt = require('jsonwebtoken');
 
 // FIX: Ensure pathing for middleware is correct
-const auth = require('./middleware/auth'); 
+const auth = require('../middleware/auth'); 
 
 // Ensure these match your filenames exactly (Case Sensitivity matters)
 const Worker = require('../models/Worker'); // Usually capitalized if the file is Worker.js
