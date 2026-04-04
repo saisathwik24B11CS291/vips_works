@@ -37,9 +37,7 @@ const Post = require('./models/Post');
 const Employer = require('./models/Employer'); 
 
 const app = express();
-const port = process.env.PORT || 5000; // ✅ use Render PORT if available
-app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
-const saltRounds = 10; 
+const saltRounds = 10;
 
 
 
@@ -83,9 +81,6 @@ const authMiddleware = async (req, res, next) => {
         res.status(401).json({ message: "Session expired" });
     }
 };
-
-// 2. Export it so workerRoutes.js and employerRoutes.js can use it
-module.exports = authMiddleware;
 
 // 2. DO NOT redeclare it later in the file!
 // If you have: const authMiddleware = require('./middleware/auth'); 
@@ -161,7 +156,6 @@ app.use((req,res,next)=>{
 app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
 // health check
 app.get('/health', (req,res)=> res.json({status:'ok', time:new Date().toISOString()}));
-app.get('/', (req, res) => res.send('VIPs Backend is Running 🚀'));
 // expose Google client id to frontend (no secrets)
 app.get('/api/config/google-client', (req,res)=>{
     if(!GOOGLE_CLIENT_ID){
