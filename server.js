@@ -35,7 +35,8 @@ const Post = require('./models/Post');
 const Employer = require('./models/Employer'); 
 
 const app = express();
-const port = process.env.PORT || 5000; 
+const port = process.env.PORT || 5000; // ✅ use Render PORT if available
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
 const saltRounds = 10; 
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/vips_db"; 
