@@ -4,7 +4,7 @@ const router = express.Router();
 const Employer = require('../models/Employer'); // Path check
 // Path check
 const multer = require('multer'); 
-const auth = require('./middleware/auth','../server');
+const auth = require('./middleware/auth');
 const User = require('../models/User');
 
 // Configure Multer
