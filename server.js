@@ -65,7 +65,7 @@ const mailTransporter = (() => {
 // 1. Define it near the top of server.js
 const authMiddleware = async (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
         if (!token) return res.status(401).json({ message: "No token provided" });
 
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -1236,7 +1236,7 @@ $or:[
 const invites = await JobInvite.find({
 employerId:req.user._id,
 jobTitle: job,
-status:"pending"
+status: { $in: ["pending", "accepted"] }
 });
 
 const invitedIds = invites.map(i => i.workerId.toString());
@@ -1337,8 +1337,7 @@ try{
 const workerId = req.user._id;
 
 let invites = await JobInvite.find({
-workerId:workerId,
-status:"pending"
+workerId:workerId
 })
 .populate("employerId","username location")
 .sort({createdAt:-1});
@@ -1443,6 +1442,16 @@ req.params.inviteId,
 res.json({message:"Job rejected"});
 
 });
+app.post("/api/jobs/cancel/:inviteId", authMiddleware, async (req,res)=>{
+
+await JobInvite.findByIdAndUpdate(
+req.params.inviteId,
+{status:"pending"}
+);
+
+res.json({message:"Invite cancelled"});
+
+});
 app.delete("/api/jobs/invite/:workerId", authMiddleware, async (req, res) => {
 
 try {
@@ -1473,7 +1482,41 @@ try{
 const jobs = await Job.find()
 .populate("employerId","username companyName location profilePicture");
 
-res.json(jobs);
+// Try to get user from token if provided
+let user = null;
+try {
+    const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
+    if (token) {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        user = await Employer.findById(decoded.id) || await Worker.findById(decoded.id);
+    }
+} catch (err) {
+    // Ignore auth errors, treat as anonymous
+}
+
+let jobsWithStatus = jobs;
+if (user && user.role === 'worker') {
+    const applications = await JobApplication.find({
+        workerId: user._id,
+        status: { $in: ['applied', 'withdrawn'] }
+    });
+    
+    const appMap = new Map();
+    applications.forEach(function(app) {
+        appMap.set(app.jobId.toString(), app);
+    });
+    
+    jobsWithStatus = [];
+    jobs.forEach(function(job) {
+        const app = appMap.get(job._id.toString());
+        const jobObj = job.toObject();
+        jobObj._applied = !!app;
+        jobObj._applicationStatus = app ? app.status : undefined;
+        jobsWithStatus.push(jobObj);
+    });
+}
+
+res.json(jobsWithStatus);
 
 }catch(err){
 

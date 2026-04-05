@@ -721,9 +721,9 @@ let filtered=(invitesCache||[]).filter(inv=>{
     const blob=`${inv.jobTitle||""} ${inv.message||""} ${inv.jobLocation||""} ${inv.employerId?.username||""}`.toLowerCase();
     return blob.includes(term);
 });
-// apply invite status filter (local session markers)
+// apply invite status filter (use server status)
 filtered = filtered.filter(inv=>{
-    const status = inv._localStatus || "pending";
+    const status = inv.status || "pending";
     if(inviteFilterStatus==="all") return true;
     if(inviteFilterStatus==="pending") return status==="pending";
     if(inviteFilterStatus==="accepted") return status==="accepted";
@@ -753,7 +753,7 @@ filtered.forEach(invite=>{
     const sameJobLoc = userLocNorm && jobLocNorm && (jobLocNorm.includes(userLocNorm) || userLocNorm.includes(jobLocNorm));
     const sameEmployerLoc = userLocNorm && employerLocNorm && (employerLocNorm.includes(userLocNorm) || userLocNorm.includes(employerLocNorm));
     const showAlert = !(sameJobLoc && sameEmployerLoc); // warn if job OR employer location differs from worker
-    const status = invite._localStatus || "pending";
+    const status = invite.status || "pending";
     let actions = "";
     if(status === "accepted"){
         actions = `
@@ -792,7 +792,9 @@ container.innerHTML="<p style='color:#888'>Loading posted jobs...</p>";
 
 try{
 
-const res=await fetch(`${API_BASE}/api/jobs/public`);
+const res=await fetch(`${API_BASE}/api/jobs/public`, {
+    headers:{'Authorization':`Bearer ${token}`}
+});
 postedJobsCache=await res.json();
 
 renderPostedJobs();
@@ -914,23 +916,11 @@ async function applyJob(id, btn=null){
             method:"POST",
             headers:{"Authorization":"Bearer "+token}
         });
-        // mark as applied locally for filter
-        postedJobsCache = (postedJobsCache||[]).map(j=> j._id===id ? {...j, _applied:true} : j);
+        // Reload jobs from server to get updated application status
+        await loadPostedJobs();
         if(btn){
-            // swap buttons inline for immediate feedback
-            const card = btn.closest('.job-card');
-            if(card){
-                const wrap = document.createElement('div');
-                wrap.style.display='flex';
-                wrap.style.gap='10px';
-                wrap.innerHTML = `
-                    <button disabled style="flex:1;background:#113c1c;color:#8bffd6;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Applied</button>
-                    <button onclick="cancelApplied('${id}')" style="background:#30363d;color:#ff9393;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
-                `;
-                btn.replaceWith(wrap);
-            }
+            // The button will be updated by renderPostedJobs
         }
-        renderPostedJobs();
     }catch(err){
         alert("Could not apply right now");
         console.error(err);
@@ -942,8 +932,8 @@ async function cancelApplied(id){
             method:"DELETE",
             headers:{"Authorization":"Bearer "+token}
         });
-        postedJobsCache = (postedJobsCache||[]).map(j=> j._id===id ? {...j, _applied:false} : j);
-        renderPostedJobs();
+        // Reload jobs from server to get updated application status
+        await loadPostedJobs();
     }catch(err){
         console.error(err);
     }
@@ -955,9 +945,8 @@ async function acceptJob(id){
             method:"POST",
             headers:{"Authorization":"Bearer "+token}
         });
-        // keep invite visible in-session marked accepted
-        invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"accepted"} : inv);
-        renderInvites();
+        // Reload invites from server to get updated status
+        await loadJobInvites();
     }catch{}
 }
 
@@ -967,21 +956,25 @@ async function rejectJob(id){
             method:"POST",
             headers:{"Authorization":"Bearer "+token}
         });
-        invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"rejected"} : inv);
-        renderInvites();
+        // Reload invites from server to get updated status
+        await loadJobInvites();
     }catch{}
 }
 
 function cancelInvite(id){
-    // cancel accepted -> revert to pending locally and call reject to inform backend
-    rejectJob(id);
-    invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"pending"} : inv);
-    renderInvites();
+    // cancel accepted -> revert to pending
+    fetch(`${API_BASE}/api/jobs/cancel/${id}`,{
+        method:"POST",
+        headers:{"Authorization":"Bearer "+token}
+    }).then(() => loadJobInvites()).catch(()=>{});
 }
 
 function undoInvite(id){
-    invitesCache = (invitesCache||[]).map(inv=> inv._id===id ? {...inv, _localStatus:"pending"} : inv);
-    renderInvites();
+    // undo rejected -> revert to pending
+    fetch(`${API_BASE}/api/jobs/cancel/${id}`,{
+        method:"POST",
+        headers:{"Authorization":"Bearer "+token}
+    }).then(() => loadJobInvites()).catch(()=>{});
 }
 
 function toggleLocationPopup(isOpen){

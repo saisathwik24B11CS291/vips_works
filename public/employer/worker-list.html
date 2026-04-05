@@ -355,7 +355,7 @@ try{
 btn.disabled = true;
 btn.innerHTML = "⏳";
 
-const res = await fetch(window.location.origin + "/api/jobs/invite/${workerId}",{
+const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"POST",
 headers:{
 "Content-Type":"application/json",
@@ -368,16 +368,12 @@ jobLocation: locationText
 })
 });
 
-await res.json();
+const result = await res.json();
+if (!res.ok) {
+    throw new Error(result.message || 'Invite failed');
+}
 
-btn.disabled = false;
-btn.innerHTML = "Cancel";
-btn.style.background = "#da3633";
-btn.style.color = "white";
-
-btn.onclick = function(){
-cancelInvite(workerId, btn);
-};
+await loadWorkers(selectedJob);
 
 }catch(err){
 
@@ -401,7 +397,7 @@ try{
 btn.disabled = true;
 btn.innerHTML = "⏳";
 
-const res = await fetch(window.location.origin + "/api/jobs/invite/${workerId}",{
+const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"DELETE",
 headers:{
 "Content-Type":"application/json",
@@ -412,16 +408,12 @@ jobTitle:selectedJob
 })
 });
 
-await res.json();
+const result = await res.json();
+if (!res.ok) {
+    throw new Error(result.message || 'Cancel failed');
+}
 
-btn.disabled = false;
-btn.innerHTML = '<i class="fas fa-plus"></i>';
-btn.style.background = "#21262d";
-btn.style.color = "#00f076";
-
-btn.onclick = function(){
-sendInvite(workerId, btn);
-};
+await loadWorkers(selectedJob);
 
 }catch(err){
 
