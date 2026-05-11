@@ -38,21 +38,30 @@ const Employer = require('./models/Employer');
 
 const app = express();
 const saltRounds = 10;
+const isProduction = process.env.NODE_ENV === 'production';
+app.set('trust proxy', 1);
 
 
 
 // Mail + Google clients
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const mailTransporter = (() => {
-    if (process.env.SMTP_HOST) {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '';
+
+    if (smtpHost && smtpUser && smtpPass) {
         return nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
+            host: smtpHost,
             port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT,10) : 587,
             secure: process.env.SMTP_SECURE === 'true',
-            auth: process.env.SMTP_USER ? {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            } : undefined
+            auth: {
+                user: smtpUser,
+                pass: smtpPass
+            },
+            connectionTimeout: 15000,
+            greetingTimeout: 10000,
+            socketTimeout: 20000
         });
     }
     return null;
@@ -63,7 +72,7 @@ function getMailErrorMessage(err){
     const response = err?.response || err?.message || '';
 
     if(!mailTransporter){
-        return 'Email service is not configured. Add Gmail SMTP settings in .env.';
+        return 'Email service is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in Render environment variables.';
     }
     if(code === 'EAUTH' || response.includes('Invalid login') || response.includes('Username and Password not accepted')){
         return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
@@ -86,8 +95,7 @@ const authMiddleware = async (req, res, next) => {
 
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // Search both collections
-        const user = await Employer.findById(decoded.id) || await Worker.findById(decoded.id);
+        const user = await findUserById(decoded.id, decoded.role);
         
         if (!user) return res.status(401).json({ message: "User not found" });
 
@@ -135,9 +143,9 @@ app.use(morgan('combined', {
 }));
 // basic rate limiter (in-memory)
 const rateStore = new Map();
-const RATE_LIMIT = parseInt(process.env.RATE_LIMIT || '100',10);
+const RATE_LIMIT = parseInt(process.env.RATE_LIMIT || '300',10);
 const RATE_WINDOW_MS = parseInt(process.env.RATE_WINDOW_MS || '60000',10);
-app.use((req,res,next)=>{
+app.use('/api', (req,res,next)=>{
     const ip = req.ip || req.connection.remoteAddress || 'global';
     const now = Date.now();
     const entry = rateStore.get(ip) || {count:0, start:now};
@@ -184,7 +192,12 @@ app.get('/api/config/google-client', (req,res)=>{
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', express.static(uploadDir, {
+    maxAge: isProduction ? '7d' : 0,
+    setHeaders: (res) => {
+        if (isProduction) res.setHeader('Cache-Control', 'public, max-age=604800');
+    }
+}));
 
 app.use((req, res, next) => {
     if (req.path.endsWith('.html')) {
@@ -195,10 +208,13 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: isProduction ? '1d' : 0,
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
+        } else if (isProduction) {
+            res.setHeader('Cache-Control', 'public, max-age=86400');
         }
     }
 }));
@@ -244,6 +260,12 @@ async function findUserByEmail(email) {
     };
 
     return Worker.findOne(query) || Employer.findOne(query);
+}
+
+async function findUserById(id, role) {
+    if (role === 'employer') return Employer.findById(id);
+    if (role === 'worker') return Worker.findById(id);
+    return Worker.findById(id) || Employer.findById(id);
 }
 
 // --- AUTH ROUTES ---
@@ -529,11 +551,7 @@ app.get('/api/auth/me', async (req, res) => {
         if (!token) return res.status(401).json({ message: "No token" });
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // Check Worker first, if not found, check Employer
-        let user = await Worker.findById(decoded.id);
-        if (!user) {
-            user = await Employer.findById(decoded.id);
-        }
+        const user = await findUserById(decoded.id, decoded.role);
 
         if (!user) return res.status(404).json({ message: "User not found" });
         res.json(user);
