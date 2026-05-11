@@ -32,6 +32,9 @@
     "multer": "^2.0.2"
   },
   "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
