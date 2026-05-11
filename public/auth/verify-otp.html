@@ -43,6 +43,15 @@
             statusEl.className = `status ${type}`;
         }
 
+        async function readApiResponse(res) {
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) return res.json();
+            const text = await res.text();
+            throw new Error(text.trim().startsWith('<')
+                ? 'API route not found on this Render service. Make sure Render is running the Node server, not only a static site.'
+                : text || 'Unexpected server response');
+        }
+
         document.getElementById('code').addEventListener('input', (event) => {
             event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
         });
@@ -62,7 +71,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, code })
                 });
-                const data = await res.json();
+                const data = await readApiResponse(res);
                 if (!res.ok) throw new Error(data.message || 'Invalid OTP');
 
                 sessionStorage.setItem('recoveryCode', code);

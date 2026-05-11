@@ -1717,6 +1717,10 @@ app.use('/api/users', workerRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/messages', messageRoutes);
 
+app.use('/api', (req, res) => {
+    res.status(404).json({ message: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
 // --- SERVE INDEX.HTML FOR ROOT PATH ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
