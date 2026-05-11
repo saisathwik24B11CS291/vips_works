@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIPs | Login</title>
     <link rel="stylesheet" href="../styles.css"> 
-    <link rel="stylesheet" href="src/nav.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
@@ -188,31 +187,7 @@
         <p id="message"></p>
         <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
             <div id="google-btn" style="width:48%;"></div>
-            <button id="forgot-toggle" type="button" style="width:48%;padding:12px;border:none;background:transparent;color:var(--primary);font-weight:700;cursor:pointer;">Forgot password?</button>
-        </div>
-        <div id="forgot-panel" style="display:none; margin-top:18px; border:1px solid var(--border-color); padding:12px; border-radius:12px; background:#f8fafc;">
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>Email</label>
-                <div class="input-wrapper" style="border:1px solid var(--border-color);">
-                    <input type="email" id="fp-email" placeholder="you@email.com">
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; margin-bottom:12px;">
-                <button id="send-code-btn" type="button" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;">Send code</button>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>Code</label>
-                <div class="input-wrapper" style="border:1px solid var(--border-color);">
-                    <input type="text" id="fp-code" placeholder="6-digit code">
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>New password</label>
-                <div class="input-wrapper" style="border:1px solid var(--border-color);">
-                    <input type="password" id="fp-newpass" placeholder="New password">
-                </div>
-            </div>
-            <button id="reset-btn" type="button" style="width:100%;padding:12px;border:none;border-radius:10px;background:#0f172a;color:#fff;font-weight:700;cursor:pointer;">Reset password</button>
+            <a href="../auth/forgot-password.html?role=worker" style="width:48%;padding:12px;border:none;background:transparent;color:var(--primary);font-weight:700;text-decoration:none;text-align:right;">Forgot password?</a>
         </div>
         <p class="footer">New to VIPs? <a href="signup.html">Create account</a></p>
     </div>
@@ -224,10 +199,6 @@
         const submitBtn = document.getElementById('submit-btn');
         const pwInput = document.getElementById('login-password');
         const toggleBtn = document.getElementById('toggle-btn');
-        const forgotToggle = document.getElementById('forgot-toggle');
-        const forgotPanel = document.getElementById('forgot-panel');
-        const sendCodeBtn = document.getElementById('send-code-btn');
-        const resetBtn = document.getElementById('reset-btn');
         const googleBtnContainer = document.getElementById('google-btn');
 
         toggleBtn.addEventListener('click', () => {
@@ -301,43 +272,15 @@
     }
 });
 
-// Forgot password UI
-forgotToggle.addEventListener('click', ()=>{
-    forgotPanel.style.display = forgotPanel.style.display === 'none' ? 'block' : 'none';
-});
-
-sendCodeBtn.addEventListener('click', async ()=>{
-    const email = document.getElementById('fp-email').value.trim();
-    if(!email) return alert('Enter email');
-    sendCodeBtn.disabled = true; sendCodeBtn.innerText = 'Sending...';
-    try{
-        const res = await fetch(`${API_BASE}/api/auth/forgot`,{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ email })
-        });
-        const data = await res.json();
-        alert(data.message || (res.ok ? 'Code sent' : 'Failed'));
-    }catch(e){ alert('Network error'); }
-    sendCodeBtn.disabled = false; sendCodeBtn.innerText = 'Send code';
-});
-
-resetBtn.addEventListener('click', async ()=>{
-    const email = document.getElementById('fp-email').value.trim();
-    const code = document.getElementById('fp-code').value.trim();
-    const newPassword = document.getElementById('fp-newpass').value.trim();
-    if(!email || !code || !newPassword) return alert('Fill all fields');
-    resetBtn.disabled = true; resetBtn.innerText = 'Resetting...';
-    try{
-        const res = await fetch(`${API_BASE}/api/auth/reset`,{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ email, code, newPassword })
-        });
-        const data = await res.json();
-        alert(data.message || (res.ok ? 'Password reset' : 'Failed'));
-    }catch(e){ alert('Network error'); }
-    resetBtn.disabled = false; resetBtn.innerText = 'Reset password';
+window.addEventListener('load', () => {
+    window.history.replaceState(null, null, window.location.href);
+    // Push multiple states to prevent back to protected pages
+    for (let i = 0; i < 10; i++) {
+        window.history.pushState(null, null, window.location.href);
+    }
+    window.onpopstate = () => {
+        window.location.replace('login.html');
+    };
 });
 
 // Google sign-in via Google Identity Services
@@ -414,7 +357,6 @@ async function handleCredentialResponse(resp){
 }
 
 window.onload = ()=> {
-    loadUserLocation?.(); // keep any existing onload; safe guard
     initGoogle();
 };
 </script>

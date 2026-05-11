@@ -58,7 +58,7 @@
                                 <span><i class="far fa-clock"></i> ${job.hours}</span>
                                 <span><i class="fas fa-map-marker-alt"></i> Task-based</span>
                             </div>
-                            <button class="apply-btn" onclick="viewJob('${job._id}')">View Details & Apply</button>
+                            <button class="apply-btn" onclick="viewJob('${job._id}')">Open Job Board</button>
                         </div>
                     `;
                 });
@@ -67,7 +67,7 @@
             }
         }
 
-        function viewJob(id) { window.location.href = `job-details.html?id=${id}`; }
+        function viewJob(id) { window.location.href = `home.html?job=${id}`; }
         window.onload = loadJobs;
     </script>
 </body>

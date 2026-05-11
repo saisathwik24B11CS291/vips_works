@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify OTP | VIPs</title>
+    <link rel="stylesheet" href="recovery.css">
+</head>
+<body>
+    <main class="shell">
+        <div class="brand">VIPs</div>
+        <section class="card">
+            <h1>Enter OTP</h1>
+            <p class="sub">Check your email and enter the 6-digit OTP we sent you.</p>
+            <div class="meta" id="email-meta"></div>
+
+            <form id="verify-form">
+                <div class="field">
+                    <label for="code">OTP</label>
+                    <input id="code" class="otp-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" required>
+                </div>
+                <button class="btn" id="submit-btn" type="submit">Verify OTP</button>
+            </form>
+
+            <div class="status" id="status"></div>
+            <a class="back" id="change-email" href="forgot-password.html">Use another email</a>
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const email = sessionStorage.getItem('recoveryEmail');
+        const role = sessionStorage.getItem('recoveryRole') || new URLSearchParams(window.location.search).get('role') || 'worker';
+        const statusEl = document.getElementById('status');
+        const submitBtn = document.getElementById('submit-btn');
+
+        if (!email) window.location.replace(`forgot-password.html?role=${encodeURIComponent(role)}`);
+        document.getElementById('email-meta').textContent = email ? `OTP sent to ${email}` : '';
+        document.getElementById('change-email').href = `forgot-password.html?role=${encodeURIComponent(role)}`;
+
+        function setStatus(message, type = '') {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        document.getElementById('code').addEventListener('input', (event) => {
+            event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
+        });
+
+        document.getElementById('verify-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const code = document.getElementById('code').value.trim();
+            if (code.length !== 6) return setStatus('Enter the 6-digit OTP.', 'error');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Verifying...';
+            setStatus('');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Invalid OTP');
+
+                sessionStorage.setItem('recoveryCode', code);
+                sessionStorage.setItem('recoveryPayload', JSON.stringify(data));
+                setStatus('OTP verified.', 'success');
+                setTimeout(() => {
+                    window.location.href = `reset-options.html?role=${encodeURIComponent(data.role || role)}`;
+                }, 400);
+            } catch (err) {
+                setStatus(err.message || 'Invalid OTP', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verify OTP';
+            }
+        });
+    </script>
+</body>
+</html>

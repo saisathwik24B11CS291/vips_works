@@ -38,24 +38,7 @@
     </form>
 
     <div style="margin-top: 20px;">
-        <a id="forgot-toggle" href="javascript:void(0)" style="color: var(--text-gray); font-size: 13px; text-decoration: none;">Forgot Password?</a>
-    </div>
-
-    <div id="forgot-panel" style="display:none; margin-top:16px; border:1px solid var(--border-color); padding:12px; border-radius:12px; text-align:left;">
-        <div class="input-group" style="margin-bottom:12px;">
-            <label>Email</label>
-            <input type="email" id="fp-email" placeholder="you@email.com">
-        </div>
-        <button id="send-code-btn" type="button" class="login-btn" style="background:#111;border:1px solid var(--border-color);margin-bottom:10px;">Send code</button>
-        <div class="input-group" style="margin-bottom:12px;">
-            <label>Code</label>
-            <input type="text" id="fp-code" placeholder="6-digit code">
-        </div>
-        <div class="input-group" style="margin-bottom:12px;">
-            <label>New Password</label>
-            <input type="password" id="fp-newpass" placeholder="New password">
-        </div>
-        <button id="reset-btn" type="button" class="login-btn" style="background:#0f172a;">Reset password</button>
+        <a href="../auth/forgot-password.html?role=employer" style="color: var(--text-gray); font-size: 13px; text-decoration: none;">Forgot Password?</a>
     </div>
 
     <div style="margin-top:16px;">
@@ -110,49 +93,19 @@
         }
     };
 
-    // Forgot password flow
-    const forgotToggle = document.getElementById('forgot-toggle');
-    const forgotPanel = document.getElementById('forgot-panel');
-    const sendCodeBtn = document.getElementById('send-code-btn');
-    const resetBtn = document.getElementById('reset-btn');
+    window.addEventListener('load', () => {
+        window.history.replaceState(null, null, window.location.href);
+        // Push multiple states to prevent back to protected pages
+        for (let i = 0; i < 10; i++) {
+            window.history.pushState(null, null, window.location.href);
+        }
+        window.onpopstate = () => {
+            window.location.replace('login.html');
+        };
+    });
+
     const googleBtnContainer = document.getElementById('google-btn');
     const API_BASE = window.location.origin;
-
-    forgotToggle.onclick = ()=> forgotPanel.style.display = forgotPanel.style.display==='none'?'block':'none';
-
-    sendCodeBtn.onclick = async ()=>{
-        const email = document.getElementById('fp-email').value.trim();
-        if(!email) return alert('Enter email');
-        sendCodeBtn.disabled = true; sendCodeBtn.innerText = 'Sending...';
-        try{
-            const res = await fetch(`${API_BASE}/api/auth/forgot`,{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ email })
-            });
-            const data = await res.json();
-            alert(data.message || (res.ok ? 'Code sent' : 'Failed'));
-        }catch(e){ alert('Network error'); }
-        sendCodeBtn.disabled = false; sendCodeBtn.innerText = 'Send code';
-    };
-
-    resetBtn.onclick = async ()=>{
-        const email = document.getElementById('fp-email').value.trim();
-        const code = document.getElementById('fp-code').value.trim();
-        const newPassword = document.getElementById('fp-newpass').value.trim();
-        if(!email || !code || !newPassword) return alert('Fill all fields');
-        resetBtn.disabled = true; resetBtn.innerText = 'Resetting...';
-        try{
-            const res = await fetch(`${API_BASE}/api/auth/reset`,{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ email, code, newPassword })
-            });
-            const data = await res.json();
-            alert(data.message || (res.ok ? 'Password reset' : 'Failed'));
-        }catch(e){ alert('Network error'); }
-        resetBtn.disabled = false; resetBtn.innerText = 'Reset password';
-    };
 
     async function getGoogleClientId(){
         if(window.__googleClientId) return window.__googleClientId;

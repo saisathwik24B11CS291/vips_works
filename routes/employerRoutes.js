@@ -1,14 +1,12 @@
 const express = require('express');
 const router = express.Router();
 
-const Employer = require('../models/Employer'); // Path check
-// Path check
+const Employer = require('../models/Employer');
 const multer = require('multer'); 
 const auth = require('./middleware/auth');
 
 // Configure Multer
 const upload = multer({ dest: 'uploads/projects/' });
-console.log("Current Directory:", __dirname);
 
 // --- 1. Update Employer Profile ---
 
@@ -142,7 +140,7 @@ router.post('/update-privacy', auth, async (req, res) => {
         const { followToView, autoAccept } = req.body;
         const userId = req.user.id; // 'auth' middleware populates req.user
 
-        const updatedUser = await User.findByIdAndUpdate(
+        const updatedUser = await Employer.findByIdAndUpdate(
             userId,
             { 
                 $set: { 
@@ -153,6 +151,7 @@ router.post('/update-privacy', auth, async (req, res) => {
             { new: true }
         );
 
+        if (!updatedUser) return res.status(404).json({ error: "Employer not found" });
         res.json({ success: true, settings: updatedUser.settings });
     } catch (err) {
         console.error("Privacy Update Error:", err);

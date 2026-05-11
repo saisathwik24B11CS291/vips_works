@@ -1,32 +1,92 @@
-<div class="container">
-    <div class="header">
-        <button onclick="history.back()">←</button>
-        <h2>Following</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Following | VIPs</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        :root { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#3b82f6; }
+        body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+        .container { max-width:560px; margin:0 auto; padding:18px; }
+        .header { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+        .back-btn { border:1px solid var(--border); background:var(--card); width:40px; height:40px; border-radius:10px; cursor:pointer; }
+        h2 { margin:0; font-size:22px; }
+        .user-card { display:flex; align-items:center; gap:12px; padding:14px; background:var(--card); border:1px solid var(--border); border-radius:12px; margin-bottom:10px; cursor:pointer; }
+        .avatar { width:48px; height:48px; border-radius:50%; object-fit:cover; background:#dbeafe; }
+        .avatar-fallback { width:48px; height:48px; border-radius:50%; background:#dbeafe; color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; }
+        .details { flex:1; min-width:0; }
+        .details b, .details span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .details span { color:var(--muted); font-size:13px; margin-top:3px; }
+        .empty { color:var(--muted); text-align:center; padding:32px 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="history.back()" aria-label="Back"><i class="fas fa-arrow-left"></i></button>
+            <h2>Following</h2>
+        </div>
+        <div id="following-list"><p class="empty">Loading...</p></div>
     </div>
 
-    <div id="following-list">
-        </div>
-</div>
+    <script>
+        const API_BASE = window.location.origin;
+        const token = localStorage.getItem('token');
 
-<script>
-    async function loadFollowing() {
-        // Fetch only users that the current worker is following
-        const res = await fetch(window.location.origin + "/api/users/following", {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const employers = await res.json();
-        
-        const list = document.getElementById('following-list');
-        list.innerHTML = employers.map(emp => `
-            <div class="user-card" onclick="window.location.href='/friendprofile.html?id=${emp._id}'">
-                <img src="${API_BASE}${emp.profilePicture}" class="avatar">
-                <div class="details">
-                    <b>${emp.companyName || emp.username}</b>
-                    <span>Verified Employer</span>
-                </div>
-                <i class="fas fa-chevron-right"></i>
-            </div>
-        `).join('');
-    }
-    loadFollowing();
-</script>
+        async function loadFollowing() {
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const list = document.getElementById('following-list');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/profile/network`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Failed to load following');
+
+                const users = [
+                    ...(data.following?.workers || []),
+                    ...(data.following?.employers || [])
+                ];
+
+                if (!users.length) {
+                    list.innerHTML = '<p class="empty">You are not following anyone yet.</p>';
+                    return;
+                }
+
+                list.innerHTML = users.map(user => {
+                    const name = user.companyName || user.username || 'User';
+                    const role = user.role === 'employer' ? 'Employer' : 'Worker';
+                    const href = user.role === 'employer'
+                        ? `../employer/profile.html?id=${user._id}`
+                        : `profile.html?id=${user._id}`;
+                    const avatar = user.profilePicture
+                        ? `<img src="${API_BASE}${user.profilePicture}" class="avatar" alt="">`
+                        : `<div class="avatar-fallback">${name.charAt(0).toUpperCase()}</div>`;
+
+                    return `
+                        <div class="user-card" onclick="window.location.href='${href}'">
+                            ${avatar}
+                            <div class="details">
+                                <b>${name}</b>
+                                <span>${role}</span>
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<p class="empty">Could not load following right now.</p>';
+            }
+        }
+
+        loadFollowing();
+    </script>
+</body>
+</html>

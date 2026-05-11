@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Recovery | VIPs</title>
+    <link rel="stylesheet" href="recovery.css">
+</head>
+<body>
+    <main class="shell">
+        <div class="brand">VIPs</div>
+        <section class="card">
+            <h1>OTP verified</h1>
+            <p class="sub">Choose what you want to do next. You can login now or create a new password.</p>
+            <div class="meta" id="email-meta"></div>
+
+            <div class="stack">
+                <button class="btn" id="login-btn" type="button">Login to my account</button>
+                <button class="btn light" id="reset-btn" type="button">Reset password</button>
+            </div>
+
+            <div class="status" id="status"></div>
+        </section>
+    </main>
+
+    <script>
+        const payload = JSON.parse(sessionStorage.getItem('recoveryPayload') || 'null');
+        const email = sessionStorage.getItem('recoveryEmail');
+        const statusEl = document.getElementById('status');
+
+        if (!payload || !email) window.location.replace('forgot-password.html');
+        document.getElementById('email-meta').textContent = email || '';
+
+        function saveSession(data) {
+            localStorage.clear();
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username || '');
+            localStorage.setItem('userRole', data.role);
+            localStorage.setItem('userId', data.userId);
+        }
+
+        document.getElementById('login-btn').addEventListener('click', () => {
+            saveSession(payload);
+            statusEl.textContent = 'Logging you in...';
+            statusEl.className = 'status success';
+            const redirect = payload.redirect || (payload.role === 'employer' ? '../employer/home.html' : '../worker/home.html');
+            setTimeout(() => window.location.replace(redirect), 300);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            window.location.href = `reset-password.html?role=${encodeURIComponent(payload.role || 'worker')}`;
+        });
+    </script>
+</body>
+</html>

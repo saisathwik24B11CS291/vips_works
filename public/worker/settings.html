@@ -57,6 +57,14 @@
         function logout() {
             if(confirm("Are you sure you want to logout?")) {
                 localStorage.clear();
+                window.history.replaceState(null, null, 'login.html');
+                // Push multiple states to prevent back navigation
+                for (let i = 0; i < 10; i++) {
+                    window.history.pushState(null, null, 'login.html');
+                }
+                window.onpopstate = () => {
+                    window.location.replace('login.html');
+                };
                 window.location.replace("login.html");
             }
         }

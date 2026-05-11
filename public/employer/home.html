@@ -372,14 +372,16 @@
             const storedToken = localStorage.getItem('token');
             const storedRole = localStorage.getItem('userRole');
             if (!storedToken || storedRole !== expectedRole) {
-                window.location.replace('../login.html');
+                window.location.replace('login.html');
             }
         }
 
         window.addEventListener('pageshow', (event) => {
-            if (event.persisted || !localStorage.getItem('token')) {
-                enforceEmployerAuth();
-            }
+            enforceEmployerAuth();
+        });
+
+        window.addEventListener('pagehide', (event) => {
+            enforceEmployerAuth();
         });
 
         enforceEmployerAuth();
@@ -473,7 +475,7 @@ function resetDetectBtn() {
         }
 
         async function loadHeader() {
-            if (!token) window.location.replace('../login.html');
+            if (!token) window.location.replace('login.html');
             try {
                 const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const user = await res.json();
@@ -594,7 +596,18 @@ function closeSubSection() {
             }
         }
 
-        function logout() { localStorage.clear(); window.location.replace('../login.html'); }
+        function logout() {
+            localStorage.clear();
+            window.history.replaceState(null, null, 'login.html');
+            // Push multiple states to prevent back navigation
+            for (let i = 0; i < 10; i++) {
+                window.history.pushState(null, null, 'login.html');
+            }
+            window.onpopstate = () => {
+                window.location.replace('login.html');
+            };
+            window.location.replace('login.html');
+        }
 
         // --- SEARCH LOGIC ---
         const searchInput = document.getElementById('main-search');

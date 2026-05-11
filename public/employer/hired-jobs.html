@@ -136,7 +136,7 @@ function renderCurrent(){
 }
 
 async function loadAll(){
-    if(!token) return window.location.href='../login.html';
+    if(!token) return window.location.href='login.html';
     // jobs
     try{
         const jr=await fetch(`${API_BASE}/api/jobs/mine`,{headers:{'Authorization':`Bearer ${token}`}});

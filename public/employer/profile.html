@@ -135,7 +135,7 @@
     <div class="sidebar" id="sidebar">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 30px;">Menu</div>
         <a href="edit-profile.html" class="menu-item">👤 Edit Profile</a>
-        <a href="wallet.html" class="menu-item">💳 My Earnings</a>
+        <a href="hired-jobs.html" class="menu-item">💼 Hired Jobs</a>
         <a href="settings.html" class="menu-item">⚙️ Settings</a>
         <a href="#" onclick="logout()" class="menu-item" style="color:var(--danger); margin-top: 50px;">🚪 Logout</a>
     </div>
@@ -227,9 +227,11 @@
         }
 
         window.addEventListener('pageshow', (event) => {
-            if (event.persisted || !localStorage.getItem('token')) {
-                enforceEmployerAuth();
-            }
+            enforceEmployerAuth();
+        });
+
+        window.addEventListener('pagehide', (event) => {
+            enforceEmployerAuth();
         });
 
         enforceEmployerAuth();
@@ -301,7 +303,7 @@
                 const btnBox = document.getElementById('action-btn-container');
                 if (isVisitor) {
                     if (isFollowing) {
-                        btnBox.innerHTML = `<button onclick="window.location.href='chat.html?id=${user._id}'" style="width:100%; padding:12px; background:var(--accent-blue); border:none; border-radius:10px; color:white; font-weight:bold;">Message Worker</button>`;
+                        btnBox.innerHTML = `<button onclick="window.location.href='../chat.html?id=${user._id}'" style="width:100%; padding:12px; background:var(--accent-blue); border:none; border-radius:10px; color:white; font-weight:bold;">Message Worker</button>`;
                     } else {
                         const isRequested = user.followRequests?.some(id => id.toString() === myId);
                         btnBox.innerHTML = `<button onclick="handleFollow('${user._id}')" id="follow-btn" style="width:100%; padding:12px; background:transparent; border:1px solid var(--accent-blue); border-radius:10px; color:var(--accent-blue); font-weight:bold;">${isRequested ? 'Requested' : 'Follow to Contact'}</button>`;
@@ -340,7 +342,7 @@
             const btn = document.getElementById('follow-btn');
             btn.innerText = "Sending...";
             try {
-                const res = await fetch(`${API_BASE}/api/worker/follow/${targetId}`, {
+                const res = await fetch(`${API_BASE}/api/users/follow/${targetId}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
@@ -609,9 +611,20 @@
             overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
         }
 
-        function logout() { localStorage.clear(); window.location.replace('login.html'); }
+        function logout() {
+            localStorage.clear();
+            window.history.replaceState(null, null, 'login.html');
+            // Push multiple states to prevent back navigation
+            for (let i = 0; i < 10; i++) {
+                window.history.pushState(null, null, 'login.html');
+            }
+            window.onpopstate = () => {
+                window.location.replace('login.html');
+            };
+            window.location.replace('login.html');
+        }
 
-        async function loadJobCount(){
+        async function loadJobCount(){  
             try{
                 const res = await fetch(`${API_BASE}/api/jobs/mine`,{
                     headers:{'Authorization':`Bearer ${token}`}

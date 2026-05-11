@@ -775,11 +775,7 @@ async function runFollowAction(targetId){
 
 async function callFollowEndpoint(targetId){
   const opts={method:'POST',headers:{'Authorization':`Bearer ${token}`}};
-  let res=await fetch(`${API_BASE}/api/worker/follow/${targetId}`,opts);
-  if(res.status===404){
-    res=await fetch(`${API_BASE}/api/users/follow/${targetId}`,opts);
-  }
-  return res;
+  return fetch(`${API_BASE}/api/users/follow/${targetId}`,opts);
 }
 
 function refreshFollowCounts(){

@@ -58,6 +58,22 @@ const mailTransporter = (() => {
     return null;
 })();
 
+function getMailErrorMessage(err){
+    const code = err?.code || err?.responseCode || '';
+    const response = err?.response || err?.message || '';
+
+    if(!mailTransporter){
+        return 'Email service is not configured. Add Gmail SMTP settings in .env.';
+    }
+    if(code === 'EAUTH' || response.includes('Invalid login') || response.includes('Username and Password not accepted')){
+        return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
+    }
+    if(code === 'ECONNECTION' || code === 'ETIMEDOUT' || code === 'ESOCKET'){
+        return 'Could not connect to Gmail SMTP. Check internet/firewall and SMTP settings.';
+    }
+    return 'Could not send OTP email. Check Gmail SMTP settings.';
+}
+
 
 // ... (Imports like express, mongoose, etc.)
 
@@ -322,57 +338,174 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// Forgot password (email code)
+// Forgot password (email OTP)
 function generateCode(){ return Math.floor(100000 + Math.random()*900000).toString(); }
 
-async function sendResetEmail(email, code){
+function getAuthDestination(role) {
+    return role === 'employer' ? '/employer/home.html' : '/worker/home.html';
+}
+
+function buildAuthPayload(user) {
+    return {
+        id: user._id,
+        role: user.role,
+        username: user.username
+    };
+}
+
+async function findUserByEmail(email) {
+    const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const emailQuery = { $regex: `^${escaped}$`, $options: 'i' };
+    return Worker.findOne({ email: emailQuery }) || Employer.findOne({ email: emailQuery });
+}
+
+async function sendResetEmail(email, code, user){
+    const name = user?.username || 'VIPs user';
     if(mailTransporter){
         await mailTransporter.sendMail({
             from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@vips.com',
             to: email,
-            subject: 'Your VIPs reset code',
-            text: `Use this code to reset your password: ${code}`
+            subject: 'Your VIPs password reset OTP',
+            text: `Hi ${name},\n\nYour VIPs password reset OTP is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
+            html: `
+                <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
+                    <h2 style="margin:0 0 8px;color:#0f172a;">VIPs password reset</h2>
+                    <p style="color:#475569;">Hi ${name}, use this OTP to continue your password reset.</p>
+                    <div style="font-size:32px;letter-spacing:8px;font-weight:800;color:#2563eb;background:#eff6ff;padding:18px;text-align:center;border-radius:12px;">${code}</div>
+                    <p style="color:#64748b;font-size:13px;">This code expires in 15 minutes. If you did not request it, ignore this email.</p>
+                </div>
+            `
         });
     }else{
         console.warn(`No SMTP configured. Reset code for ${email}: ${code}`);
     }
 }
 
+async function sendPasswordChangedEmail(email, user){
+    const name = user?.username || 'VIPs user';
+    if(mailTransporter){
+        await mailTransporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@vips.com',
+            to: email,
+            subject: 'Your VIPs password was changed',
+            text: `Hi ${name},\n\nYour VIPs password has been changed successfully. If this was not you, reset your password immediately.`,
+            html: `
+                <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
+                    <h2 style="margin:0 0 8px;color:#0f172a;">Password changed</h2>
+                    <p style="color:#475569;">Hi ${name}, your VIPs password has been changed successfully.</p>
+                    <p style="color:#64748b;font-size:13px;">If this was not you, please request a new OTP and reset your password immediately.</p>
+                </div>
+            `
+        });
+    }else{
+        console.warn(`No SMTP configured. Password changed email skipped for ${email}`);
+    }
+}
+
+function validateResetToken(resetToken, email) {
+    const decoded = jwt.verify(resetToken, JWT_SECRET);
+    if (decoded.purpose !== 'password-reset' || decoded.email !== email) {
+        throw new Error('Invalid reset session');
+    }
+    return decoded;
+}
+
 app.post('/api/auth/forgot', async (req,res)=>{
     try{
         const { email } = req.body;
         if(!email) return res.status(400).json({message:"Email required"});
-        let user = await Worker.findOne({ email }) || await Employer.findOne({ email });
+        const normalizedEmail = email.trim().toLowerCase();
+        let user = await findUserByEmail(normalizedEmail);
         if(!user) return res.status(404).json({message:"User not found"});
         const code = generateCode();
         user.resetCode = code;
         user.resetCodeExpires = new Date(Date.now()+15*60*1000);
         await user.save();
-        await sendResetEmail(email, code);
-        res.json({message:"Reset code sent"});
+        try {
+            await sendResetEmail(normalizedEmail, code, user);
+        } catch (mailErr) {
+            console.error("OTP email error", {
+                code: mailErr?.code,
+                responseCode: mailErr?.responseCode,
+                response: mailErr?.response,
+                message: mailErr?.message
+            });
+            return res.status(502).json({message:getMailErrorMessage(mailErr)});
+        }
+        res.json({message:"OTP sent to your email", role:user.role});
     }catch(err){
         console.error("Forgot error", err);
         res.status(500).json({message:"Failed to send code"});
     }
 });
 
+app.post('/api/auth/verify-otp', async (req,res)=>{
+    try{
+        const { email, code } = req.body;
+        if(!email || !code) return res.status(400).json({message:"Email and OTP are required"});
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await findUserByEmail(normalizedEmail);
+        if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
+        if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
+        if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
+
+        const authToken = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
+        const resetToken = jwt.sign(
+            { id:user._id, role:user.role, email:normalizedEmail, purpose:'password-reset' },
+            JWT_SECRET,
+            { expiresIn:'15m' }
+        );
+
+        res.json({
+            message:"OTP verified",
+            token: authToken,
+            resetToken,
+            role: user.role,
+            userId: user._id,
+            username: user.username,
+            redirect: getAuthDestination(user.role)
+        });
+    }catch(err){
+        console.error("OTP verify error", err);
+        res.status(500).json({message:"Failed to verify OTP"});
+    }
+});
+
 app.post('/api/auth/reset', async (req,res)=>{
     try{
-        const { email, code, newPassword } = req.body;
-        if(!email || !code || !newPassword) return res.status(400).json({message:"Missing fields"});
-        let user = await Worker.findOne({ email }) || await Employer.findOne({ email });
-        if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid code"});
-        if(user.resetCode !== code) return res.status(400).json({message:"Invalid code"});
-        if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"Code expired"});
+        const { email, code, newPassword, resetToken } = req.body;
+        if(!email || !newPassword) return res.status(400).json({message:"Missing fields"});
+        const normalizedEmail = email.trim().toLowerCase();
+        let user = await findUserByEmail(normalizedEmail);
+        if(!user) return res.status(400).json({message:"User not found"});
+
+        if(resetToken){
+            validateResetToken(resetToken, normalizedEmail);
+        }else{
+            if(!code || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
+            if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
+            if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
+        }
+
         user.password = await bcrypt.hash(newPassword, 10);
         user.resetCode = null;
         user.resetCodeExpires = null;
         user.loginProvider = 'local';
         await user.save();
-        res.json({message:"Password reset successful"});
+        await sendPasswordChangedEmail(normalizedEmail, user);
+
+        const token = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
+        res.json({
+            message:"Password changed successfully",
+            token,
+            role:user.role,
+            userId:user._id,
+            username:user.username,
+            redirect:getAuthDestination(user.role)
+        });
     }catch(err){
         console.error("Reset error", err);
-        res.status(500).json({message:"Failed to reset password"});
+        res.status(401).json({message:"Failed to reset password"});
     }
 });
 app.get('/api/auth/me', async (req, res) => {
@@ -560,6 +693,8 @@ app.put('/api/profile/update', (req, res, next) => {
         if (req.body.location) updateData.location = req.body.location; // Handles your Home Page update
         if (req.body.phone) updateData.phone = req.body.phone;
         if (req.body.bio) updateData.bio = req.body.bio;
+        if (req.body.companyName) updateData.companyName = req.body.companyName;
+        if (req.body.category) updateData.category = req.body.category;
         if (req.body.mainCategory) updateData.mainCategory = req.body.mainCategory;
         if (req.file) updateData.profilePicture = `/uploads/${req.file.filename}`;
 
@@ -1235,7 +1370,7 @@ $or:[
 
 const invites = await JobInvite.find({
 employerId:req.user._id,
-jobTitle: job,
+workerId: { $exists: true },
 status: { $in: ["pending", "accepted"] }
 });
 
