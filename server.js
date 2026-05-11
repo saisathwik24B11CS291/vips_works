@@ -226,6 +226,26 @@ const workerRoutes = require('./routes/workerRoutes');
 const employerRoutes = require('./routes/employerRoutes');
 const messageRoutes = require('./routes/message');
 
+function normalizeEmail(email){
+    return String(email || '').trim().toLowerCase();
+}
+
+async function findUserByEmail(email) {
+    const normalized = normalizeEmail(email);
+    if(!normalized) return null;
+    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
+
+    const query = {
+        $or: [
+            { email: exactCaseInsensitive },
+            { username: exactCaseInsensitive }
+        ]
+    };
+
+    return Worker.findOne(query) || Employer.findOne(query);
+}
+
 // --- AUTH ROUTES ---
 // Unified Signup: Handles both Worker and Employer safely
 app.post('/api/auth/signup', async (req, res) => {
@@ -236,7 +256,8 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        const existingUser = await Worker.findOne({ email }) || await Employer.findOne({ email });
+        const normalizedEmail = normalizeEmail(email);
+        const existingUser = await findUserByEmail(normalizedEmail);
         if (existingUser) return res.status(400).json({ error: "Email already exists" });
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -244,7 +265,7 @@ app.post('/api/auth/signup', async (req, res) => {
         if (role === 'employer') {
             const newEmployer = new Employer({ 
                 username, 
-                email, 
+                email: normalizedEmail, 
                 password: hashedPassword, 
                 phone, 
                 role,
@@ -256,7 +277,7 @@ app.post('/api/auth/signup', async (req, res) => {
             // This call triggers the pre-save middleware in Employer.js
             await newEmployer.save(); 
         } else {
-            const newWorker = new Worker({ username, email, password: hashedPassword, phone, role });
+            const newWorker = new Worker({ username, email: normalizedEmail, password: hashedPassword, phone, role });
             await newWorker.save();
         } 
 
@@ -311,12 +332,12 @@ app.post('/api/auth/google', async (req, res) => {
         const client = new OAuth2Client(GOOGLE_CLIENT_ID);
         const ticket = await client.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
         const payload = ticket.getPayload();
-        const email = payload.email;
+        const email = normalizeEmail(payload.email);
         const name = payload.name || payload.email.split('@')[0];
         const googleId = payload.sub;
 
         // find existing
-        let user = await Worker.findOne({ email }) || await Employer.findOne({ email });
+        let user = await findUserByEmail(email);
         if(!user){
             const pickedRole = role === 'employer' ? 'employer' : 'worker';
             if(pickedRole === 'employer'){
@@ -351,12 +372,6 @@ function buildAuthPayload(user) {
         role: user.role,
         username: user.username
     };
-}
-
-async function findUserByEmail(email) {
-    const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const emailQuery = { $regex: `^${escaped}$`, $options: 'i' };
-    return Worker.findOne({ email: emailQuery }) || Employer.findOne({ email: emailQuery });
 }
 
 async function sendResetEmail(email, code, user){
@@ -414,7 +429,7 @@ app.post('/api/auth/forgot', async (req,res)=>{
     try{
         const { email } = req.body;
         if(!email) return res.status(400).json({message:"Email required"});
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(email);
         let user = await findUserByEmail(normalizedEmail);
         if(!user) return res.status(404).json({message:"User not found"});
         const code = generateCode();
@@ -443,7 +458,7 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
     try{
         const { email, code } = req.body;
         if(!email || !code) return res.status(400).json({message:"Email and OTP are required"});
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(email);
         const user = await findUserByEmail(normalizedEmail);
         if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
@@ -475,7 +490,7 @@ app.post('/api/auth/reset', async (req,res)=>{
     try{
         const { email, code, newPassword, resetToken } = req.body;
         if(!email || !newPassword) return res.status(400).json({message:"Missing fields"});
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(email);
         let user = await findUserByEmail(normalizedEmail);
         if(!user) return res.status(400).json({message:"User not found"});
 
