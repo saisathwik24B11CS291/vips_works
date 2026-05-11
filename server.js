@@ -45,6 +45,8 @@ app.set('trust proxy', 1);
 
 // Mail + Google clients
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const MAIL_FROM = process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || 'VIPs <onboarding@resend.dev>';
 const mailTransporter = (() => {
     const smtpHost = process.env.SMTP_HOST;
     const smtpUser = process.env.SMTP_USER;
@@ -71,8 +73,14 @@ function getMailErrorMessage(err){
     const code = err?.code || err?.responseCode || '';
     const response = err?.response || err?.message || '';
 
+    if (RESEND_API_KEY && err?.provider === 'resend') {
+        if (err.status === 401 || err.status === 403) {
+            return 'Email API authentication failed. Check RESEND_API_KEY in Render environment variables.';
+        }
+        return err.message || 'Email API could not send OTP. Check your Resend sender/domain settings.';
+    }
     if(!mailTransporter){
-        return 'Email service is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in Render environment variables.';
+        return 'Email service is not configured. Add RESEND_API_KEY and MAIL_FROM in Render environment variables.';
     }
     if(code === 'EAUTH' || response.includes('Invalid login') || response.includes('Username and Password not accepted')){
         return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
@@ -81,6 +89,53 @@ function getMailErrorMessage(err){
         return 'Could not connect to Gmail SMTP. If this is running on Render Free, SMTP ports 25, 465, and 587 are blocked; use a paid Render instance or an email HTTP API provider.';
     }
     return 'Could not send OTP email. Check Gmail SMTP settings.';
+}
+
+async function sendEmail({ to, subject, text, html }) {
+    if (RESEND_API_KEY) {
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${RESEND_API_KEY}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'vips-app'
+            },
+            body: JSON.stringify({
+                from: MAIL_FROM,
+                to: [to],
+                subject,
+                text,
+                html
+            })
+        });
+
+        if (!response.ok) {
+            let detail = '';
+            try {
+                const data = await response.json();
+                detail = data.message || data.error || JSON.stringify(data);
+            } catch {
+                detail = await response.text();
+            }
+            const err = new Error(detail || `Email API failed with status ${response.status}`);
+            err.provider = 'resend';
+            err.status = response.status;
+            throw err;
+        }
+        return response.json();
+    }
+
+    if (mailTransporter) {
+        return mailTransporter.sendMail({
+            from: MAIL_FROM,
+            to,
+            subject,
+            text,
+            html
+        });
+    }
+
+    throw new Error('No email provider configured');
 }
 
 
@@ -398,45 +453,35 @@ function buildAuthPayload(user) {
 
 async function sendResetEmail(email, code, user){
     const name = user?.username || 'VIPs user';
-    if(mailTransporter){
-        await mailTransporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@vips.com',
-            to: email,
-            subject: 'Your VIPs password reset OTP',
-            text: `Hi ${name},\n\nYour VIPs password reset OTP is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
-            html: `
-                <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
-                    <h2 style="margin:0 0 8px;color:#0f172a;">VIPs password reset</h2>
-                    <p style="color:#475569;">Hi ${name}, use this OTP to continue your password reset.</p>
-                    <div style="font-size:32px;letter-spacing:8px;font-weight:800;color:#2563eb;background:#eff6ff;padding:18px;text-align:center;border-radius:12px;">${code}</div>
-                    <p style="color:#64748b;font-size:13px;">This code expires in 15 minutes. If you did not request it, ignore this email.</p>
-                </div>
-            `
-        });
-    }else{
-        console.warn(`No SMTP configured. Reset code for ${email}: ${code}`);
-    }
+    await sendEmail({
+        to: email,
+        subject: 'Your VIPs password reset OTP',
+        text: `Hi ${name},\n\nYour VIPs password reset OTP is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
+                <h2 style="margin:0 0 8px;color:#0f172a;">VIPs password reset</h2>
+                <p style="color:#475569;">Hi ${name}, use this OTP to continue your password reset.</p>
+                <div style="font-size:32px;letter-spacing:8px;font-weight:800;color:#2563eb;background:#eff6ff;padding:18px;text-align:center;border-radius:12px;">${code}</div>
+                <p style="color:#64748b;font-size:13px;">This code expires in 15 minutes. If you did not request it, ignore this email.</p>
+            </div>
+        `
+    });
 }
 
 async function sendPasswordChangedEmail(email, user){
     const name = user?.username || 'VIPs user';
-    if(mailTransporter){
-        await mailTransporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@vips.com',
-            to: email,
-            subject: 'Your VIPs password was changed',
-            text: `Hi ${name},\n\nYour VIPs password has been changed successfully. If this was not you, reset your password immediately.`,
-            html: `
-                <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
-                    <h2 style="margin:0 0 8px;color:#0f172a;">Password changed</h2>
-                    <p style="color:#475569;">Hi ${name}, your VIPs password has been changed successfully.</p>
-                    <p style="color:#64748b;font-size:13px;">If this was not you, please request a new OTP and reset your password immediately.</p>
-                </div>
-            `
-        });
-    }else{
-        console.warn(`No SMTP configured. Password changed email skipped for ${email}`);
-    }
+    await sendEmail({
+        to: email,
+        subject: 'Your VIPs password was changed',
+        text: `Hi ${name},\n\nYour VIPs password has been changed successfully. If this was not you, reset your password immediately.`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
+                <h2 style="margin:0 0 8px;color:#0f172a;">Password changed</h2>
+                <p style="color:#475569;">Hi ${name}, your VIPs password has been changed successfully.</p>
+                <p style="color:#64748b;font-size:13px;">If this was not you, please request a new OTP and reset your password immediately.</p>
+            </div>
+        `
+    });
 }
 
 function validateResetToken(resetToken, email) {
