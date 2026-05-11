@@ -51,6 +51,11 @@ const EmployerSchema = new mongoose.Schema({
             _id: { type: mongoose.Schema.Types.ObjectId, auto: true }
         }]
     }],
+    bookedWorkers: [{
+        workerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Worker' },
+        status: { type: String, default: 'Booked' },
+        bookedAt: { type: Date, default: Date.now }
+    }],
     resetCode: { type: String, default: null },
     resetCodeExpires: { type: Date, default: null },
     loginProvider: { type: String, default: 'local' }
@@ -69,12 +74,6 @@ EmployerSchema.pre('save', async function() {
     }
     // Mongoose knows the function is done when it reaches the end of this block.
 });
-
-bookedWorkers: [{
-        workerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Worker' },
-        status: { type: String, default: 'Booked' }, 
-        bookedAt: { type: Date, default: Date.now }
-    }],
 
 // Final export
 module.exports = mongoose.models.Employer || mongoose.model('Employer', EmployerSchema);
