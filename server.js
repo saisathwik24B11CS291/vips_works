@@ -78,7 +78,7 @@ function getMailErrorMessage(err){
         return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
     }
     if(code === 'ECONNECTION' || code === 'ETIMEDOUT' || code === 'ESOCKET'){
-        return 'Could not connect to Gmail SMTP. Check internet/firewall and SMTP settings.';
+        return 'Could not connect to Gmail SMTP. If this is running on Render Free, SMTP ports 25, 465, and 587 are blocked; use a paid Render instance or an email HTTP API provider.';
     }
     return 'Could not send OTP email. Check Gmail SMTP settings.';
 }
