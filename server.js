@@ -432,6 +432,17 @@ async function findUserByEmail(email) {
     return Employer.findOne(query);
 }
 
+async function findUserByEmailOnly(email) {
+    const normalized = normalizeEmail(email);
+    if(!normalized) return null;
+    const escaped = escapeRegex(normalized);
+    const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
+
+    const worker = await Worker.findOne({ email: exactCaseInsensitive });
+    if (worker) return worker;
+    return Employer.findOne({ email: exactCaseInsensitive });
+}
+
 async function findUserByUsername(username) {
     const normalized = normalizeUsername(username);
     if(!normalized) return null;
@@ -556,7 +567,7 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: "Change username. It is already used by someone." });
         }
 
-        const existingUser = await findUserByEmail(normalizedEmail);
+        const existingUser = await findUserByEmailOnly(normalizedEmail);
         if (existingUser) return res.status(400).json({ error: "Email already exists. Please use another email." });
 
         await cleanupExpiredSignupOtps();
@@ -652,7 +663,7 @@ app.post('/api/auth/signup/verify', async (req, res) => {
             return res.status(400).json({ message: "Change username. It is already used by someone." });
         }
 
-        const existingUser = await findUserByEmail(pendingSignup.email);
+        const existingUser = await findUserByEmailOnly(pendingSignup.email);
         if (existingUser) {
             await PendingSignup.deleteOne({ token: signupToken });
             return res.status(400).json({ message: "Email already exists. Please use another email." });
