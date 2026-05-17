@@ -256,9 +256,15 @@
 
                 if (response.ok) {
                     messagePara.style.color = "var(--success)";
-                    messagePara.innerText = `Success! Registered as ${role}. Redirecting...`;
+                    messagePara.innerText = data.message || "OTP sent. Opening verification...";
+                    sessionStorage.setItem('signupVerification', JSON.stringify({
+                        signupToken: data.signupToken,
+                        email: data.email,
+                        maskedEmail: data.maskedEmail,
+                        role: data.role || role
+                    }));
                     setTimeout(() => {
-                        window.location.href = "login.html";
+                        window.location.href = "../auth/signup-verify.html";
                     }, 2000);
                 } else {
                     submitBtn.disabled = false;

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Signup OTP | VIPs</title>
+    <link rel="stylesheet" href="recovery.css">
+</head>
+<body>
+    <main class="shell">
+        <div class="brand">VIPs</div>
+        <section class="card">
+            <h1>Enter OTP</h1>
+            <p class="sub">Check your email and enter the 6-digit OTP to finish creating your account.</p>
+            <div class="meta" id="email-meta"></div>
+
+            <form id="otp-form">
+                <div class="field">
+                    <label for="code">OTP</label>
+                    <input class="otp-input" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+                </div>
+                <div class="stack">
+                    <button class="btn" id="submit-btn" type="submit">Verify & Create Account</button>
+                    <button class="btn light" id="resend-btn" type="button">Resend OTP</button>
+                </div>
+            </form>
+
+            <div class="status" id="status"></div>
+            <a class="back" id="start-over" href="../worker/signup.html">Use another email</a>
+        </section>
+    </main>
+
+    <script>
+    const API_BASE = window.location.origin;
+    const statusEl = document.getElementById('status');
+    const submitBtn = document.getElementById('submit-btn');
+    const resendBtn = document.getElementById('resend-btn');
+    const codeInput = document.getElementById('code');
+
+    function setStatus(message, type = '') {
+        statusEl.textContent = message;
+        statusEl.className = `status ${type}`;
+    }
+
+    function getSignupSession() {
+        try {
+            return JSON.parse(sessionStorage.getItem('signupVerification') || 'null');
+        } catch {
+            return null;
+        }
+    }
+
+    const session = getSignupSession();
+    const role = session?.role === 'employer' ? 'employer' : 'worker';
+    const signupPath = role === 'employer' ? '../employer/signup.html' : '../worker/signup.html';
+    const loginPath = role === 'employer' ? '../employer/login.html' : '../worker/login.html';
+    document.getElementById('start-over').href = signupPath;
+
+    if (!session?.signupToken) {
+        window.location.replace(signupPath);
+    } else {
+        document.getElementById('email-meta').textContent = `OTP sent to ${session.maskedEmail || session.email || 'your email'}`;
+    }
+
+    codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+    });
+
+    document.getElementById('otp-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const code = codeInput.value.trim();
+        if (code.length !== 6) return setStatus('Enter the 6-digit OTP.', 'error');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying...';
+        setStatus('Verifying OTP...');
+
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/signup/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ signupToken: session.signupToken, code })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Invalid OTP');
+
+            sessionStorage.removeItem('signupVerification');
+            setStatus(data.message || 'Account created successfully. Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = loginPath;
+            }, 1500);
+        } catch (err) {
+            setStatus(err.message || 'Invalid OTP', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Verify & Create Account';
+        }
+    });
+
+    resendBtn.addEventListener('click', async () => {
+        resendBtn.disabled = true;
+        resendBtn.textContent = 'Sending...';
+        setStatus('Sending a new OTP...');
+
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/signup/resend`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ signupToken: session.signupToken })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Could not resend OTP');
+            setStatus(data.message || 'New OTP sent.', 'success');
+        } catch (err) {
+            setStatus(err.message || 'Could not resend OTP', 'error');
+        } finally {
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend OTP';
+        }
+    });
+    </script>
+</body>
+</html>

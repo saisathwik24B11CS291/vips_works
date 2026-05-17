@@ -142,9 +142,15 @@
 
         if (response.ok) {
             messageEl.style.color = '#22c55e';
-            messageEl.textContent = "Signup successful! Welcome " + signupData.username;
+            messageEl.textContent = result.message || "OTP sent. Opening verification...";
+            sessionStorage.setItem('signupVerification', JSON.stringify({
+                signupToken: result.signupToken,
+                email: result.email,
+                maskedEmail: result.maskedEmail,
+                role: result.role || 'employer'
+            }));
             setTimeout(() => {
-                window.location.href = 'login.html';
+                window.location.href = '../auth/signup-verify.html';
             }, 1500);
         } else {
             // Displays the error from the server (like "next is not a function" or "Email exists")
