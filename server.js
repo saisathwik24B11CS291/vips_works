@@ -367,13 +367,17 @@ async function findUserByEmail(email) {
         ]
     };
 
-    return Worker.findOne(query) || Employer.findOne(query);
+    const worker = await Worker.findOne(query);
+    if (worker) return worker;
+    return Employer.findOne(query);
 }
 
 async function findUserById(id, role) {
     if (role === 'employer') return Employer.findById(id);
     if (role === 'worker') return Worker.findById(id);
-    return Worker.findById(id) || Employer.findById(id);
+    const worker = await Worker.findById(id);
+    if (worker) return worker;
+    return Employer.findById(id);
 }
 
 // --- AUTH ROUTES ---
