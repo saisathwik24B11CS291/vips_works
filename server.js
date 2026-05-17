@@ -439,8 +439,18 @@ async function findUserByEmailOnly(email) {
     const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
 
     const worker = await Worker.findOne({ email: exactCaseInsensitive });
-    if (worker) return worker;
-    return Employer.findOne({ email: exactCaseInsensitive });
+    if (worker) return { user: worker, role: 'worker' };
+    const employer = await Employer.findOne({ email: exactCaseInsensitive });
+    if (employer) return { user: employer, role: 'employer' };
+    return null;
+}
+
+function duplicateCollectionName(err) {
+    return String(err?.collection?.collectionName || err?.collection || err?.message || '').toLowerCase();
+}
+
+function isDuplicateFromCollection(err, collectionName) {
+    return err?.code === 11000 && duplicateCollectionName(err).includes(collectionName.toLowerCase());
 }
 
 async function findUserByUsername(username) {
@@ -610,7 +620,11 @@ app.post('/api/auth/signup', async (req, res) => {
         }
 
         const existingUser = await findUserByEmailOnly(normalizedEmail);
-        if (existingUser) return res.status(400).json({ error: "Email already exists. Please use another email." });
+        if (existingUser) {
+            return res.status(400).json({
+                error: `This email is already registered as a ${existingUser.role} account. Please login or use another email.`
+            });
+        }
 
         await cleanupExpiredSignupOtps();
         await removePendingSignupIndexes();
@@ -652,15 +666,14 @@ app.post('/api/auth/signup', async (req, res) => {
         console.error("Signup Error:", err);
         if (err?.code === 11000) {
             const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
-            const collectionName = err?.collection || err?.message || '';
-            if (String(collectionName).toLowerCase().includes('pendingsignups')) {
+            if (isDuplicateFromCollection(err, 'pendingsignups')) {
                 return res.status(400).json({ error: "OTP already sent for this signup. Please open the OTP page or try again." });
             }
-            if (field === 'username') {
+            if (field === 'username' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
                 return res.status(400).json({ error: "Change username. It is already used by someone." });
             }
-            if (field === 'email') {
-                return res.status(400).json({ error: "Email already exists. Please use another email." });
+            if (field === 'email' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
+                return res.status(400).json({ error: "This email is already registered. Please login or use another email." });
             }
         }
         res.status(500).json({ error: err.message }); 
@@ -707,7 +720,9 @@ app.post('/api/auth/signup/verify', async (req, res) => {
         const existingUser = await findUserByEmailOnly(pendingSignup.email);
         if (existingUser) {
             await PendingSignup.deleteOne({ token: signupToken });
-            return res.status(400).json({ message: "Email already exists. Please use another email." });
+            return res.status(400).json({
+                message: `This email is already registered as a ${existingUser.role} account. Please login or use another email.`
+            });
         }
 
         const createdUser = await createUserFromSignupData(pendingSignup);
@@ -732,11 +747,14 @@ app.post('/api/auth/signup/verify', async (req, res) => {
         console.error("Signup OTP verify error", err);
         if (err?.code === 11000) {
             const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
-            if (field === 'username') {
+            if (isDuplicateFromCollection(err, 'pendingsignups')) {
+                return res.status(400).json({ message: "OTP already sent for this signup. Please open the OTP page or try again." });
+            }
+            if (field === 'username' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
                 return res.status(400).json({ message: "Change username. It is already used by someone." });
             }
-            if (field === 'email') {
-                return res.status(400).json({ message: "Email already exists. Please use another email." });
+            if (field === 'email' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
+                return res.status(400).json({ message: "This email is already registered. Please login or use another email." });
             }
         }
         res.status(500).json({ message: "Failed to verify signup OTP" });
