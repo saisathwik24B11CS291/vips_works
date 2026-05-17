@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path'); 
 const fs = require('fs'); 
+const dns = require('dns').promises;
 const JobInvite = require("./models/JobInvite");
 const JobApplication = require("./models/JobApplication");
 const helmet = require('helmet');
@@ -360,6 +361,49 @@ function normalizeEmail(email){
     return String(email || '').trim().toLowerCase();
 }
 
+function normalizeUsername(username){
+    return String(username || '').trim();
+}
+
+function escapeRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[char]));
+}
+
+function isValidEmailSyntax(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+async function emailDomainCanReceiveMail(email) {
+    const domain = String(email || '').split('@')[1];
+    if (!domain) return false;
+
+    try {
+        const mxRecords = await dns.resolveMx(domain);
+        if (Array.isArray(mxRecords) && mxRecords.length > 0) return true;
+    } catch (err) {
+        if (err?.code !== 'ENODATA' && err?.code !== 'ENOTFOUND') {
+            console.warn('Email MX lookup failed:', err.message);
+        }
+    }
+
+    try {
+        await dns.lookup(domain);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 function maskEmail(email) {
     const [name = '', domain = ''] = String(email || '').split('@');
     if (!name || !domain) return '';
@@ -370,7 +414,7 @@ function maskEmail(email) {
 async function findUserByEmail(email) {
     const normalized = normalizeEmail(email);
     if(!normalized) return null;
-    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegex(normalized);
     const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
 
     const query = {
@@ -383,6 +427,42 @@ async function findUserByEmail(email) {
     const worker = await Worker.findOne(query);
     if (worker) return worker;
     return Employer.findOne(query);
+}
+
+async function findUserByUsername(username) {
+    const normalized = normalizeUsername(username);
+    if(!normalized) return null;
+    const escaped = escapeRegex(normalized);
+    const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
+
+    const worker = await Worker.findOne({ username: exactCaseInsensitive });
+    if (worker) return worker;
+    return Employer.findOne({ username: exactCaseInsensitive });
+}
+
+async function sendWelcomeEmail(email, user) {
+    const roleLabel = user.role === 'employer' ? 'Employer' : 'Worker';
+    const name = user.username || 'VIPs user';
+    const safeName = escapeHtml(name);
+    const safeRoleLabel = escapeHtml(roleLabel);
+
+    return sendEmail({
+        to: email,
+        subject: `Welcome to VIPs, ${name}`,
+        text: `Hi ${name},\n\nWelcome to VIPs ${roleLabel}.\n\nYour account is ready. Keep your profile details accurate, use a real phone number and email, and never share your password or OTP with anyone.\n\nThank you for joining VIPs.`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a;">
+                <h2 style="margin:0 0 12px;">Welcome to VIPs ${safeRoleLabel}</h2>
+                <p>Hi ${safeName}, your account is ready.</p>
+                <ul>
+                    <li>Keep your profile details accurate.</li>
+                    <li>Use a real phone number and email for account recovery.</li>
+                    <li>Never share your password or OTP with anyone.</li>
+                </ul>
+                <p style="color:#64748b;font-size:13px;">Thank you for joining VIPs.</p>
+            </div>
+        `
+    });
 }
 
 async function findUserById(id, role) {
@@ -399,38 +479,68 @@ app.post('/api/auth/signup', async (req, res) => {
     const { role, username, email, password, phone, businessCategory } = req.body;
 
     try {
-        if (!username || !email || !password) {
+        const normalizedUsername = normalizeUsername(username);
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!normalizedUsername || !normalizedEmail || !password) {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        const normalizedEmail = normalizeEmail(email);
+        if (!isValidEmailSyntax(normalizedEmail)) {
+            return res.status(400).json({ error: "Invalid email address. Please use a correct email." });
+        }
+
+        const canReceiveMail = await emailDomainCanReceiveMail(normalizedEmail);
+        if (!canReceiveMail) {
+            return res.status(400).json({ error: "Invalid email address. This email domain cannot receive mail. Please use another email." });
+        }
+
+        const existingUsername = await findUserByUsername(normalizedUsername);
+        if (existingUsername) {
+            return res.status(400).json({ error: "Change username. It is already used by someone." });
+        }
+
         const existingUser = await findUserByEmail(normalizedEmail);
-        if (existingUser) return res.status(400).json({ error: "Email already exists" });
+        if (existingUser) return res.status(400).json({ error: "Email already exists. Please use another email." });
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        let createdUser;
 
         if (role === 'employer') {
             const newEmployer = new Employer({ 
-                username, 
+                username: normalizedUsername, 
                 email: normalizedEmail, 
                 password: hashedPassword, 
                 phone, 
                 role,
-                companyName: username,
+                companyName: normalizedUsername,
                 settings: { followToView: false, autoAccept: true },
                 // Maps your frontend selection (e.g., Construction) to the DB field
                 mainCategory: businessCategory || "General Business"
             });
             // This call triggers the pre-save middleware in Employer.js
-            await newEmployer.save(); 
+            createdUser = await newEmployer.save(); 
         } else {
-            const newWorker = new Worker({ username, email: normalizedEmail, password: hashedPassword, phone, role });
-            await newWorker.save();
+            const newWorker = new Worker({ username: normalizedUsername, email: normalizedEmail, password: hashedPassword, phone, role: 'worker' });
+            createdUser = await newWorker.save();
         } 
 
-        res.status(201).json({ message: "Success" });
+        sendWelcomeEmail(normalizedEmail, createdUser).catch((mailErr) => {
+            console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
+        });
+
+        res.status(201).json({ message: "Success. Account created and welcome email is being sent." });
     } catch (err) { 
         console.error("Signup Error:", err);
+        if (err?.code === 11000) {
+            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
+            if (field === 'username') {
+                return res.status(400).json({ error: "Change username. It is already used by someone." });
+            }
+            if (field === 'email') {
+                return res.status(400).json({ error: "Email already exists. Please use another email." });
+            }
+        }
         res.status(500).json({ error: err.message }); 
     }
 });
