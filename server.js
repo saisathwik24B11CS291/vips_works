@@ -4,9 +4,6 @@ require('dotenv').config(); // Load .env variables before any process.env reads
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change_me_in_env';
 
-console.log('RESEND:', process.env.RESEND_API_KEY ? '[SET]' : process.env.RESEND_API_KEY);
-console.log('MAIL:', process.env.MAIL_FROM);
-
 const express = require('express'); 
 const mongoose = require('mongoose');
 const cors = require('cors'); 
@@ -50,24 +47,31 @@ app.set('trust proxy', 1);
 
 // Mail + Google clients
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.trim() : '';
-const RESEND_API_KEY = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : '';
-const MAIL_FROM = (process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || 'VIPs <onboarding@resend.dev>').trim();
-const SMTP_HOST = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : '';
-const SMTP_USER = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : '';
-const SMTP_PASS = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '';
+function cleanEnv(name) {
+    return process.env[name] ? String(process.env[name]).trim() : '';
+}
+
+const RESEND_API_KEY = cleanEnv('RESEND_API_KEY');
+const MAIL_FROM = cleanEnv('MAIL_FROM') || cleanEnv('SMTP_FROM') || cleanEnv('SMTP_USER');
+const SMTP_HOST = cleanEnv('SMTP_HOST');
+const SMTP_USER = cleanEnv('SMTP_USER');
+const SMTP_PASS = process.env.SMTP_PASS ? String(process.env.SMTP_PASS).replace(/\s+/g, '') : '';
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+const hasResendConfig = Boolean(RESEND_API_KEY && MAIL_FROM);
+const hasSmtpConfig = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && MAIL_FROM);
 
-console.log('MAIL ENV:', {
-    RESEND_API_KEY: RESEND_API_KEY ? '[SET]' : '[MISSING]',
-    MAIL_FROM: MAIL_FROM || '[MISSING]',
-    SMTP_HOST: SMTP_HOST ? '[SET]' : '[MISSING]',
-    SMTP_USER: SMTP_USER ? '[SET]' : '[MISSING]',
-    SMTP_PASS: SMTP_PASS ? '[SET]' : '[MISSING]'
+console.log('MAIL CONFIG:', {
+    provider: hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : 'none',
+    resendApiKey: RESEND_API_KEY ? '[SET]' : '[MISSING]',
+    mailFrom: MAIL_FROM ? '[SET]' : '[MISSING]',
+    smtpHost: SMTP_HOST ? '[SET]' : '[MISSING]',
+    smtpUser: SMTP_USER ? '[SET]' : '[MISSING]',
+    smtpPass: SMTP_PASS ? '[SET]' : '[MISSING]'
 });
 
 const mailTransporter = (() => {
-    if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    if (hasSmtpConfig) {
         return nodemailer.createTransport({
             host: SMTP_HOST,
             port: SMTP_PORT,
@@ -88,7 +92,7 @@ function getMailErrorMessage(err){
     const code = err?.code || err?.responseCode || '';
     const response = err?.response || err?.message || '';
 
-    if (RESEND_API_KEY && err?.provider === 'resend') {
+    if (err?.provider === 'resend') {
         if (err.status === 401 || err.status === 403) {
             return 'Email API authentication failed. Check RESEND_API_KEY in Render environment variables.';
         }
@@ -107,7 +111,7 @@ function getMailErrorMessage(err){
 }
 
 async function sendEmail({ to, subject, text, html }) {
-    if (RESEND_API_KEY) {
+    if (hasResendConfig) {
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -150,7 +154,12 @@ async function sendEmail({ to, subject, text, html }) {
         });
     }
 
-    throw new Error('No email provider configured');
+    const missing = [];
+    if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
+    if (!MAIL_FROM) missing.push('MAIL_FROM');
+    const err = new Error(`No email provider configured. Missing ${missing.join(' and ') || 'email settings'}.`);
+    err.code = 'EMAIL_NOT_CONFIGURED';
+    throw err;
 }
 
 
@@ -255,6 +264,15 @@ app.get('/api/config/google-client', (req,res)=>{
         return res.status(503).json({ clientId: null, message: 'Google login not configured' });
     }
     res.json({ clientId: GOOGLE_CLIENT_ID });
+});
+app.get('/api/config/email', (req,res)=>{
+    const provider = hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : null;
+    res.status(provider ? 200 : 503).json({
+        provider,
+        resendApiKeyConfigured: Boolean(RESEND_API_KEY),
+        mailFromConfigured: Boolean(MAIL_FROM),
+        smtpConfigured: hasSmtpConfig
+    });
 });
 // Add this to your main server file (e.g., server.js)
 
