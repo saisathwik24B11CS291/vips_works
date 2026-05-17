@@ -676,9 +676,15 @@ app.post('/api/auth/signup/verify', async (req, res) => {
             console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
         });
 
+        const token = jwt.sign({ id: createdUser._id, role: createdUser.role }, JWT_SECRET, { expiresIn: '24h' });
+        const redirect = createdUser.role === 'employer' ? '../employer/home.html' : '../worker/home.html';
+
         res.status(201).json({
             message: "Email verified. Account created successfully.",
             role: createdUser.role,
+            userId: createdUser._id,
+            token,
+            redirect,
             username: createdUser.username
         });
     } catch (err) {
