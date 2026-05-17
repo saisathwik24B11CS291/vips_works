@@ -13,6 +13,7 @@ const multer = require('multer');
 const path = require('path'); 
 const fs = require('fs'); 
 const dns = require('dns').promises;
+const crypto = require('crypto');
 const JobInvite = require("./models/JobInvite");
 const JobApplication = require("./models/JobApplication");
 const helmet = require('helmet');
@@ -38,10 +39,12 @@ const Worker = require('./models/Worker');
 const Message = require('./models/Message');
 const Post = require('./models/Post'); 
 const Employer = require('./models/Employer'); 
+const PendingSignup = require('./models/PendingSignup');
 
 const app = express();
 const saltRounds = 10;
 const isProduction = process.env.NODE_ENV === 'production';
+const SIGNUP_OTP_TTL_MS = 15 * 60 * 1000;
 app.set('trust proxy', 1);
 
 
@@ -440,6 +443,34 @@ async function findUserByUsername(username) {
     return Employer.findOne({ username: exactCaseInsensitive });
 }
 
+async function cleanupExpiredSignupOtps() {
+    await PendingSignup.deleteMany({ expiresAt: { $lte: new Date() } });
+}
+
+function createSignupToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+async function sendSignupOtpEmail(email, code, pendingSignup) {
+    const roleLabel = pendingSignup.role === 'employer' ? 'Employer' : 'Worker';
+    const safeName = escapeHtml(pendingSignup.username || 'VIPs user');
+    const safeRoleLabel = escapeHtml(roleLabel);
+
+    return sendEmail({
+        to: email,
+        subject: 'Your VIPs signup OTP',
+        text: `Hi ${pendingSignup.username},\n\nYour VIPs ${roleLabel} signup OTP is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
+        html: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
+                <h2 style="margin:0 0 8px;color:#0f172a;">Verify your VIPs ${safeRoleLabel} account</h2>
+                <p style="color:#475569;">Hi ${safeName}, enter this OTP to finish creating your account.</p>
+                <div style="font-size:32px;letter-spacing:8px;font-weight:800;color:#2563eb;background:#eff6ff;padding:18px;text-align:center;border-radius:12px;">${code}</div>
+                <p style="color:#64748b;font-size:13px;">This code expires in 15 minutes. If you did not request it, ignore this email.</p>
+            </div>
+        `
+    });
+}
+
 async function sendWelcomeEmail(email, user) {
     const roleLabel = user.role === 'employer' ? 'Employer' : 'Worker';
     const name = user.username || 'VIPs user';
@@ -463,6 +494,31 @@ async function sendWelcomeEmail(email, user) {
             </div>
         `
     });
+}
+
+async function createUserFromSignupData(signupData) {
+    if (signupData.role === 'employer') {
+        const newEmployer = new Employer({
+            username: signupData.username,
+            email: signupData.email,
+            password: signupData.passwordHash,
+            phone: signupData.phone,
+            role: 'employer',
+            companyName: signupData.username,
+            settings: { followToView: false, autoAccept: true },
+            mainCategory: signupData.businessCategory || "General Business"
+        });
+        return newEmployer.save();
+    }
+
+    const newWorker = new Worker({
+        username: signupData.username,
+        email: signupData.email,
+        password: signupData.passwordHash,
+        phone: signupData.phone,
+        role: 'worker'
+    });
+    return newWorker.save();
 }
 
 async function findUserById(id, role) {
@@ -503,33 +559,47 @@ app.post('/api/auth/signup', async (req, res) => {
         const existingUser = await findUserByEmail(normalizedEmail);
         if (existingUser) return res.status(400).json({ error: "Email already exists. Please use another email." });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        let createdUser;
+        await cleanupExpiredSignupOtps();
 
-        if (role === 'employer') {
-            const newEmployer = new Employer({ 
-                username: normalizedUsername, 
-                email: normalizedEmail, 
-                password: hashedPassword, 
-                phone, 
-                role,
-                companyName: normalizedUsername,
-                settings: { followToView: false, autoAccept: true },
-                // Maps your frontend selection (e.g., Construction) to the DB field
-                mainCategory: businessCategory || "General Business"
-            });
-            // This call triggers the pre-save middleware in Employer.js
-            createdUser = await newEmployer.save(); 
-        } else {
-            const newWorker = new Worker({ username: normalizedUsername, email: normalizedEmail, password: hashedPassword, phone, role: 'worker' });
-            createdUser = await newWorker.save();
-        } 
+        const signupRole = role === 'employer' ? 'employer' : 'worker';
+        const code = generateCode();
+        const token = createSignupToken();
+        const pendingSignup = {
+            role: signupRole,
+            username: normalizedUsername,
+            email: normalizedEmail,
+            passwordHash: await bcrypt.hash(password, 10),
+            phone: String(phone || '').trim(),
+            businessCategory,
+            codeHash: await bcrypt.hash(code, 10),
+            expiresAt: new Date(Date.now() + SIGNUP_OTP_TTL_MS),
+            attempts: 0
+        };
 
-        sendWelcomeEmail(normalizedEmail, createdUser).catch((mailErr) => {
-            console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
+        await PendingSignup.deleteMany({
+            $or: [
+                { email: normalizedEmail },
+                { username: normalizedUsername }
+            ]
         });
+        await PendingSignup.create({ token, ...pendingSignup });
 
-        res.status(201).json({ message: "Success. Account created and welcome email is being sent." });
+        try {
+            await sendSignupOtpEmail(normalizedEmail, code, pendingSignup);
+        } catch (mailErr) {
+            await PendingSignup.deleteOne({ token });
+            console.error("Signup OTP Email Error:", mailErr);
+            return res.status(503).json({ error: getMailErrorMessage(mailErr) });
+        }
+
+        res.status(200).json({
+            message: `OTP sent to ${maskEmail(normalizedEmail)}`,
+            otpRequired: true,
+            signupToken: token,
+            email: normalizedEmail,
+            maskedEmail: maskEmail(normalizedEmail),
+            role: signupRole
+        });
     } catch (err) { 
         console.error("Signup Error:", err);
         if (err?.code === 11000) {
@@ -542,6 +612,99 @@ app.post('/api/auth/signup', async (req, res) => {
             }
         }
         res.status(500).json({ error: err.message }); 
+    }
+});
+
+app.post('/api/auth/signup/verify', async (req, res) => {
+    try {
+        const { signupToken, code } = req.body;
+        await cleanupExpiredSignupOtps();
+
+        if (!signupToken || !code) {
+            return res.status(400).json({ message: "Signup session and OTP are required" });
+        }
+
+        const pendingSignup = await PendingSignup.findOne({ token: signupToken });
+        if (!pendingSignup) {
+            return res.status(400).json({ message: "Signup OTP expired. Please register again." });
+        }
+
+        if (pendingSignup.expiresAt < new Date()) {
+            await PendingSignup.deleteOne({ token: signupToken });
+            return res.status(400).json({ message: "Signup OTP expired. Please register again." });
+        }
+
+        pendingSignup.attempts += 1;
+        if (pendingSignup.attempts > 5) {
+            await PendingSignup.deleteOne({ token: signupToken });
+            return res.status(429).json({ message: "Too many wrong OTP attempts. Please register again." });
+        }
+        await pendingSignup.save();
+
+        const isCodeValid = await bcrypt.compare(String(code).trim(), pendingSignup.codeHash);
+        if (!isCodeValid) {
+            return res.status(400).json({ message: "Invalid OTP" });
+        }
+
+        const existingUsername = await findUserByUsername(pendingSignup.username);
+        if (existingUsername) {
+            await PendingSignup.deleteOne({ token: signupToken });
+            return res.status(400).json({ message: "Change username. It is already used by someone." });
+        }
+
+        const existingUser = await findUserByEmail(pendingSignup.email);
+        if (existingUser) {
+            await PendingSignup.deleteOne({ token: signupToken });
+            return res.status(400).json({ message: "Email already exists. Please use another email." });
+        }
+
+        const createdUser = await createUserFromSignupData(pendingSignup);
+        await PendingSignup.deleteOne({ token: signupToken });
+
+        sendWelcomeEmail(pendingSignup.email, createdUser).catch((mailErr) => {
+            console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
+        });
+
+        res.status(201).json({
+            message: "Email verified. Account created successfully.",
+            role: createdUser.role,
+            username: createdUser.username
+        });
+    } catch (err) {
+        console.error("Signup OTP verify error", err);
+        if (err?.code === 11000) {
+            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
+            if (field === 'username') {
+                return res.status(400).json({ message: "Change username. It is already used by someone." });
+            }
+            if (field === 'email') {
+                return res.status(400).json({ message: "Email already exists. Please use another email." });
+            }
+        }
+        res.status(500).json({ message: "Failed to verify signup OTP" });
+    }
+});
+
+app.post('/api/auth/signup/resend', async (req, res) => {
+    try {
+        const { signupToken } = req.body;
+        await cleanupExpiredSignupOtps();
+
+        if (!signupToken) return res.status(400).json({ message: "Signup session is required" });
+        const pendingSignup = await PendingSignup.findOne({ token: signupToken });
+        if (!pendingSignup) return res.status(400).json({ message: "Signup OTP expired. Please register again." });
+
+        const code = generateCode();
+        pendingSignup.codeHash = await bcrypt.hash(code, 10);
+        pendingSignup.expiresAt = new Date(Date.now() + SIGNUP_OTP_TTL_MS);
+        pendingSignup.attempts = 0;
+        await pendingSignup.save();
+
+        await sendSignupOtpEmail(pendingSignup.email, code, pendingSignup);
+        res.json({ message: `New OTP sent to ${maskEmail(pendingSignup.email)}` });
+    } catch (err) {
+        console.error("Signup OTP resend error", err);
+        res.status(503).json({ message: getMailErrorMessage(err) });
     }
 });
 // Unified Login: Searches across both collections
