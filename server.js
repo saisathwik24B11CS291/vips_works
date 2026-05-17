@@ -49,22 +49,32 @@ app.set('trust proxy', 1);
 
 
 // Mail + Google clients
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const MAIL_FROM = process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || 'VIPs <onboarding@resend.dev>';
-const mailTransporter = (() => {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.trim() : '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.trim() : '';
+const MAIL_FROM = (process.env.MAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || 'VIPs <onboarding@resend.dev>').trim();
+const SMTP_HOST = process.env.SMTP_HOST ? process.env.SMTP_HOST.trim() : '';
+const SMTP_USER = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : '';
+const SMTP_PASS = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '';
+const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
 
-    if (smtpHost && smtpUser && smtpPass) {
+console.log('MAIL ENV:', {
+    RESEND_API_KEY: RESEND_API_KEY ? '[SET]' : '[MISSING]',
+    MAIL_FROM: MAIL_FROM || '[MISSING]',
+    SMTP_HOST: SMTP_HOST ? '[SET]' : '[MISSING]',
+    SMTP_USER: SMTP_USER ? '[SET]' : '[MISSING]',
+    SMTP_PASS: SMTP_PASS ? '[SET]' : '[MISSING]'
+});
+
+const mailTransporter = (() => {
+    if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
         return nodemailer.createTransport({
-            host: smtpHost,
-            port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT,10) : 587,
-            secure: process.env.SMTP_SECURE === 'true',
+            host: SMTP_HOST,
+            port: SMTP_PORT,
+            secure: SMTP_SECURE,
             auth: {
-                user: smtpUser,
-                pass: smtpPass
+                user: SMTP_USER,
+                pass: SMTP_PASS
             },
             connectionTimeout: 15000,
             greetingTimeout: 10000,
@@ -85,7 +95,7 @@ function getMailErrorMessage(err){
         return err.message || 'Email API could not send OTP. Check your Resend sender/domain settings.';
     }
     if(!mailTransporter){
-        return 'Email service is not configured. Add RESEND_API_KEY and MAIL_FROM in Render environment variables.';
+        return 'Email service is not configured. Add RESEND_API_KEY or SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) plus MAIL_FROM in Render environment variables.';
     }
     if(code === 'EAUTH' || response.includes('Invalid login') || response.includes('Username and Password not accepted')){
         return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
