@@ -56,22 +56,25 @@ function cleanEnv(name) {
 }
 
 const RESEND_API_KEY = cleanEnv('RESEND_API_KEY');
-const MAIL_FROM = cleanEnv('MAIL_FROM') || cleanEnv('SMTP_FROM') || cleanEnv('SMTP_USER');
+const RESEND_FROM = cleanEnv('MAIL_FROM');
 const SMTP_HOST = cleanEnv('SMTP_HOST');
 const SMTP_USER = cleanEnv('SMTP_USER');
 const SMTP_PASS = process.env.SMTP_PASS ? String(process.env.SMTP_PASS).replace(/\s+/g, '') : '';
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
-const hasResendConfig = Boolean(RESEND_API_KEY && MAIL_FROM);
-const hasSmtpConfig = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && MAIL_FROM);
+const SMTP_FROM_ADDRESS = cleanEnv('SMTP_FROM') || SMTP_USER;
+const hasSmtpConfig = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && SMTP_FROM_ADDRESS);
+const hasResendConfig = Boolean(RESEND_API_KEY && RESEND_FROM);
+const activeMailProvider = hasSmtpConfig ? 'smtp' : hasResendConfig ? 'resend' : 'none';
 
 console.log('MAIL CONFIG:', {
-    provider: hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : 'none',
+    provider: activeMailProvider,
     resendApiKey: RESEND_API_KEY ? '[SET]' : '[MISSING]',
-    mailFrom: MAIL_FROM ? '[SET]' : '[MISSING]',
+    resendFrom: RESEND_FROM ? '[SET]' : '[MISSING]',
     smtpHost: SMTP_HOST ? '[SET]' : '[MISSING]',
     smtpUser: SMTP_USER ? '[SET]' : '[MISSING]',
-    smtpPass: SMTP_PASS ? '[SET]' : '[MISSING]'
+    smtpPass: SMTP_PASS ? '[SET]' : '[MISSING]',
+    smtpFrom: SMTP_FROM_ADDRESS ? '[SET]' : '[MISSING]'
 });
 
 const mailTransporter = (() => {
@@ -94,12 +97,14 @@ const mailTransporter = (() => {
 
 function getEmailConfigStatus() {
     return {
-        provider: hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : null,
+        provider: activeMailProvider === 'none' ? null : activeMailProvider,
         resendApiKeyConfigured: Boolean(RESEND_API_KEY),
-        mailFromConfigured: Boolean(MAIL_FROM),
+        mailFromConfigured: Boolean(RESEND_FROM || SMTP_FROM_ADDRESS),
+        resendFromConfigured: Boolean(RESEND_FROM),
         smtpHostConfigured: Boolean(SMTP_HOST),
         smtpUserConfigured: Boolean(SMTP_USER),
         smtpPassConfigured: Boolean(SMTP_PASS),
+        smtpFromConfigured: Boolean(SMTP_FROM_ADDRESS),
         smtpConfigured: hasSmtpConfig
     };
 }
@@ -111,7 +116,7 @@ function getMailErrorMessage(err){
     if (code === 'EMAIL_NOT_CONFIGURED') {
         const missing = [];
         if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
-        if (!MAIL_FROM) missing.push('MAIL_FROM');
+        if (!RESEND_FROM && !SMTP_FROM_ADDRESS) missing.push('MAIL_FROM or SMTP_FROM');
         return `Email service is not configured on the running server. Missing: ${missing.join(', ') || 'email settings'}. Check Render environment variables, save changes, then redeploy/restart the service.`;
     }
     if (err?.provider === 'resend') {
@@ -146,6 +151,16 @@ function getMailErrorMessage(err){
 }
 
 async function sendEmail({ to, subject, text, html }) {
+    if (mailTransporter) {
+        return mailTransporter.sendMail({
+            from: SMTP_FROM_ADDRESS,
+            to,
+            subject,
+            text,
+            html
+        });
+    }
+
     if (hasResendConfig) {
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -155,7 +170,7 @@ async function sendEmail({ to, subject, text, html }) {
                 'User-Agent': 'vips-app'
             },
             body: JSON.stringify({
-                from: MAIL_FROM,
+                from: RESEND_FROM,
                 to: [to],
                 subject,
                 text,
@@ -179,19 +194,9 @@ async function sendEmail({ to, subject, text, html }) {
         return response.json();
     }
 
-    if (mailTransporter) {
-        return mailTransporter.sendMail({
-            from: MAIL_FROM,
-            to,
-            subject,
-            text,
-            html
-        });
-    }
-
     const missing = [];
     if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
-    if (!MAIL_FROM) missing.push('MAIL_FROM');
+    if (!RESEND_FROM && !SMTP_FROM_ADDRESS) missing.push('MAIL_FROM or SMTP_FROM');
     const err = new Error(`No email provider configured. Missing ${missing.join(' and ') || 'email settings'}.`);
     err.code = 'EMAIL_NOT_CONFIGURED';
     throw err;
