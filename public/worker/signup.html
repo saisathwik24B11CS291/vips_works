@@ -239,10 +239,10 @@
             const role = localStorage.getItem('userRole') || 'worker';
 
             // 2. Match IDs exactly to the inputs
-            const username = document.getElementById('signup-username').value;
-            const email = document.getElementById('email').value;
+            const username = document.getElementById('signup-username').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = pwInput.value;
-            const phone = document.getElementById('phone').value;
+            const phone = document.getElementById('phone').value.trim();
 
             try {
                 // 3. Connect to your server

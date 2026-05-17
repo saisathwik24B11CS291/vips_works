@@ -57,6 +57,7 @@
 
         .footer-link { margin-top: 25px; font-size: 14px; color: var(--text-gray); }
         .footer-link a { color: var(--accent-blue); text-decoration: none; font-weight: bold; }
+        #message { min-height: 20px; margin: 15px 0 0; font-size: 14px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -68,8 +69,8 @@
 
     <form id="signup-form" onsubmit="handleSignup(event)">
         <div class="input-group">
-            <label>Full Business Name</label>
-            <input type="text" id="username" placeholder="e.g. Skyline Logistics" required>
+            <label>Choose Username</label>
+            <input type="text" id="username" placeholder="Choose username" required>
         </div>
 
         
@@ -91,6 +92,7 @@
 
         <button type="submit" class="signup-btn">Get Started</button>
     </form>
+    <p id="message"></p>
 
     <div class="footer-link">
         Already have an account? <a href="login.html">Login</a>
@@ -107,6 +109,13 @@
     const emailEl = document.getElementById('email');
     const passwordEl = document.getElementById('password');
     const phoneEl = document.getElementById('phone');
+    const messageEl = document.getElementById('message');
+    const submitBtn = document.querySelector('.signup-btn');
+
+    messageEl.style.color = '#94a3b8';
+    messageEl.textContent = 'Creating account...';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating Account...';
 
     // 2. Extract values safely
     
@@ -132,15 +141,24 @@
         const result = await response.json();
 
         if (response.ok) {
-            alert("Signup Successful! Welcome " + signupData.username);
-            window.location.href = 'login.html';
+            messageEl.style.color = '#22c55e';
+            messageEl.textContent = "Signup successful! Welcome " + signupData.username;
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 1500);
         } else {
             // Displays the error from the server (like "next is not a function" or "Email exists")
-            alert(result.error || result.message || "Signup failed");
+            messageEl.style.color = '#ef4444';
+            messageEl.textContent = result.error || result.message || "Signup failed";
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Get Started';
         }
     } catch (error) {
         console.error("Network Error:", error);
-        alert("Connection Error: Is your server running on Port 5000?");
+        messageEl.style.color = '#ef4444';
+        messageEl.textContent = "Connection Error: Is your server running?";
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get Started';
     }
 }
 </script>
