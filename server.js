@@ -1,7 +1,12 @@
+require('dotenv').config(); // Load .env variables before any process.env reads
+
 // Use Render's dynamic port or fallback to 5000 for local dev
 const PORT = process.env.PORT || 5000;
-require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'change_me_in_env';
+
+console.log('RESEND:', process.env.RESEND_API_KEY ? '[SET]' : process.env.RESEND_API_KEY);
+console.log('MAIL:', process.env.MAIL_FROM);
+
 const express = require('express'); 
 const mongoose = require('mongoose');
 const cors = require('cors'); 
