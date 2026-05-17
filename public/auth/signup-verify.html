@@ -20,7 +20,7 @@
                     <input class="otp-input" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
                 </div>
                 <div class="stack">
-                    <button class="btn" id="submit-btn" type="submit">Verify & Create Account</button>
+                    <button class="btn" id="submit-btn" type="submit">Confirm</button>
                     <button class="btn light" id="resend-btn" type="button">Resend OTP</button>
                 </div>
             </form>
@@ -53,7 +53,7 @@
     const session = getSignupSession();
     const role = session?.role === 'employer' ? 'employer' : 'worker';
     const signupPath = role === 'employer' ? '../employer/signup.html' : '../worker/signup.html';
-    const loginPath = role === 'employer' ? '../employer/login.html' : '../worker/login.html';
+    const homePath = role === 'employer' ? '../employer/home.html' : '../worker/home.html';
     document.getElementById('start-over').href = signupPath;
 
     if (!session?.signupToken) {
@@ -84,15 +84,19 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.message || 'Invalid OTP');
 
+            if (data.token) localStorage.setItem('token', data.token);
+            if (data.role) localStorage.setItem('userRole', data.role);
+            if (data.userId) localStorage.setItem('userId', data.userId);
+            if (data.username) localStorage.setItem('username', data.username);
             sessionStorage.removeItem('signupVerification');
-            setStatus(data.message || 'Account created successfully. Redirecting...', 'success');
+            setStatus(data.message || 'Account created successfully. Opening home...', 'success');
             setTimeout(() => {
-                window.location.href = loginPath;
+                window.location.href = data.redirect || homePath;
             }, 1500);
         } catch (err) {
             setStatus(err.message || 'Invalid OTP', 'error');
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Verify & Create Account';
+            submitBtn.textContent = 'Confirm';
         }
     });
 

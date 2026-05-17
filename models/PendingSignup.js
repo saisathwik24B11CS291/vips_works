@@ -4,7 +4,7 @@ const PendingSignupSchema = new mongoose.Schema({
     token: { type: String, required: true, unique: true },
     role: { type: String, enum: ['worker', 'employer'], required: true },
     username: { type: String, required: true },
-    email: { type: String, required: true, index: true },
+    email: { type: String, required: true },
     passwordHash: { type: String, required: true },
     phone: { type: String, default: '' },
     businessCategory: { type: String, default: 'General Business' },
