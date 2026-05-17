@@ -1,4 +1,4 @@
-require('dotenv').config(); // Load .env variables before any process.env reads
+require('dotenv').config({ path: require('path').join(__dirname, '.env') }); // Load .env variables before any process.env reads
 
 // Use Render's dynamic port or fallback to 5000 for local dev
 const PORT = process.env.PORT || 5000;
