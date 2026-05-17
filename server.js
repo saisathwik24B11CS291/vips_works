@@ -347,6 +347,13 @@ function normalizeEmail(email){
     return String(email || '').trim().toLowerCase();
 }
 
+function maskEmail(email) {
+    const [name = '', domain = ''] = String(email || '').split('@');
+    if (!name || !domain) return '';
+    const visibleName = name.length <= 2 ? `${name[0] || ''}*` : `${name[0]}***${name[name.length - 1]}`;
+    return `${visibleName}@${domain}`;
+}
+
 async function findUserByEmail(email) {
     const normalized = normalizeEmail(email);
     if(!normalized) return null;
@@ -540,17 +547,19 @@ function validateResetToken(resetToken, email) {
 
 app.post('/api/auth/forgot', async (req,res)=>{
     try{
-        const { email } = req.body;
-        if(!email) return res.status(400).json({message:"Email required"});
-        const normalizedEmail = normalizeEmail(email);
-        let user = await findUserByEmail(normalizedEmail);
+        const { email, identifier } = req.body;
+        const accountIdentifier = String(identifier || email || '').trim();
+        if(!accountIdentifier) return res.status(400).json({message:"Email or username required"});
+        let user = await findUserByEmail(accountIdentifier);
         if(!user) return res.status(404).json({message:"User not found"});
+        const accountEmail = normalizeEmail(user.email);
+        if(!accountEmail) return res.status(400).json({message:"This account does not have an email address"});
         const code = generateCode();
         user.resetCode = code;
         user.resetCodeExpires = new Date(Date.now()+15*60*1000);
         await user.save();
         try {
-            await sendResetEmail(normalizedEmail, code, user);
+            await sendResetEmail(accountEmail, code, user);
         } catch (mailErr) {
             console.error("OTP email error", {
                 code: mailErr?.code,
@@ -561,7 +570,12 @@ app.post('/api/auth/forgot', async (req,res)=>{
             });
             return res.status(502).json({message:getMailErrorMessage(mailErr)});
         }
-        res.json({message:"OTP sent to your email", role:user.role});
+        res.json({
+            message:`OTP sent to ${maskEmail(accountEmail)}`,
+            email:accountEmail,
+            maskedEmail:maskEmail(accountEmail),
+            role:user.role
+        });
     }catch(err){
         console.error("Forgot error", err);
         res.status(500).json({message:"Failed to send code"});
@@ -570,17 +584,18 @@ app.post('/api/auth/forgot', async (req,res)=>{
 
 app.post('/api/auth/verify-otp', async (req,res)=>{
     try{
-        const { email, code } = req.body;
-        if(!email || !code) return res.status(400).json({message:"Email and OTP are required"});
-        const normalizedEmail = normalizeEmail(email);
-        const user = await findUserByEmail(normalizedEmail);
+        const { email, identifier, code } = req.body;
+        const accountIdentifier = String(identifier || email || '').trim();
+        if(!accountIdentifier || !code) return res.status(400).json({message:"Email or username and OTP are required"});
+        const user = await findUserByEmail(accountIdentifier);
         if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
+        const accountEmail = normalizeEmail(user.email);
 
         const authToken = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
         const resetToken = jwt.sign(
-            { id:user._id, role:user.role, email:normalizedEmail, purpose:'password-reset' },
+            { id:user._id, role:user.role, email:accountEmail, purpose:'password-reset' },
             JWT_SECRET,
             { expiresIn:'15m' }
         );
@@ -592,6 +607,8 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
             role: user.role,
             userId: user._id,
             username: user.username,
+            email: accountEmail,
+            maskedEmail: maskEmail(accountEmail),
             redirect: getAuthDestination(user.role)
         });
     }catch(err){
@@ -602,14 +619,15 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
 
 app.post('/api/auth/reset', async (req,res)=>{
     try{
-        const { email, code, newPassword, resetToken } = req.body;
-        if(!email || !newPassword) return res.status(400).json({message:"Missing fields"});
-        const normalizedEmail = normalizeEmail(email);
-        let user = await findUserByEmail(normalizedEmail);
+        const { email, identifier, code, newPassword, resetToken } = req.body;
+        const accountIdentifier = String(identifier || email || '').trim();
+        if(!accountIdentifier || !newPassword) return res.status(400).json({message:"Missing fields"});
+        let user = await findUserByEmail(accountIdentifier);
         if(!user) return res.status(400).json({message:"User not found"});
+        const accountEmail = normalizeEmail(user.email);
 
         if(resetToken){
-            validateResetToken(resetToken, normalizedEmail);
+            validateResetToken(resetToken, accountEmail);
         }else{
             if(!code || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
             if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
@@ -621,7 +639,7 @@ app.post('/api/auth/reset', async (req,res)=>{
         user.resetCodeExpires = null;
         user.loginProvider = 'local';
         await user.save();
-        await sendPasswordChangedEmail(normalizedEmail, user);
+        await sendPasswordChangedEmail(accountEmail, user);
 
         const token = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
         res.json({

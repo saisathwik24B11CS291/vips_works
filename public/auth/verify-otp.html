@@ -30,12 +30,14 @@
     <script>
         const API_BASE = window.location.origin;
         const email = sessionStorage.getItem('recoveryEmail');
+        const identifier = sessionStorage.getItem('recoveryIdentifier') || email;
+        const maskedEmail = sessionStorage.getItem('recoveryMaskedEmail') || email;
         const role = sessionStorage.getItem('recoveryRole') || new URLSearchParams(window.location.search).get('role') || 'worker';
         const statusEl = document.getElementById('status');
         const submitBtn = document.getElementById('submit-btn');
 
         if (!email) window.location.replace(`forgot-password.html?role=${encodeURIComponent(role)}`);
-        document.getElementById('email-meta').textContent = email ? `OTP sent to ${email}` : '';
+        document.getElementById('email-meta').textContent = maskedEmail ? `OTP sent to ${maskedEmail}` : '';
         document.getElementById('change-email').href = `forgot-password.html?role=${encodeURIComponent(role)}`;
 
         function setStatus(message, type = '') {
@@ -69,11 +71,13 @@
                 const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, code })
+                    body: JSON.stringify({ email, identifier, code })
                 });
                 const data = await readApiResponse(res);
                 if (!res.ok) throw new Error(data.message || 'Invalid OTP');
 
+                if (data.email) sessionStorage.setItem('recoveryEmail', data.email);
+                if (data.maskedEmail) sessionStorage.setItem('recoveryMaskedEmail', data.maskedEmail);
                 sessionStorage.setItem('recoveryCode', code);
                 sessionStorage.setItem('recoveryPayload', JSON.stringify(data));
                 setStatus('OTP verified.', 'success');

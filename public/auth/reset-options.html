@@ -26,10 +26,11 @@
     <script>
         const payload = JSON.parse(sessionStorage.getItem('recoveryPayload') || 'null');
         const email = sessionStorage.getItem('recoveryEmail');
+        const maskedEmail = sessionStorage.getItem('recoveryMaskedEmail') || email;
         const statusEl = document.getElementById('status');
 
         if (!payload || !email) window.location.replace('forgot-password.html');
-        document.getElementById('email-meta').textContent = email || '';
+        document.getElementById('email-meta').textContent = maskedEmail || '';
 
         function saveSession(data) {
             localStorage.clear();
