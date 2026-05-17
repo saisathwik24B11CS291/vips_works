@@ -88,10 +88,28 @@ const mailTransporter = (() => {
     return null;
 })();
 
+function getEmailConfigStatus() {
+    return {
+        provider: hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : null,
+        resendApiKeyConfigured: Boolean(RESEND_API_KEY),
+        mailFromConfigured: Boolean(MAIL_FROM),
+        smtpHostConfigured: Boolean(SMTP_HOST),
+        smtpUserConfigured: Boolean(SMTP_USER),
+        smtpPassConfigured: Boolean(SMTP_PASS),
+        smtpConfigured: hasSmtpConfig
+    };
+}
+
 function getMailErrorMessage(err){
     const code = err?.code || err?.responseCode || '';
     const response = err?.response || err?.message || '';
 
+    if (code === 'EMAIL_NOT_CONFIGURED') {
+        const missing = [];
+        if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
+        if (!MAIL_FROM) missing.push('MAIL_FROM');
+        return `Email service is not configured on the running server. Missing: ${missing.join(', ') || 'email settings'}. Check Render environment variables, save changes, then redeploy/restart the service.`;
+    }
     if (err?.provider === 'resend') {
         if (err.status === 401 || err.status === 403) {
             return 'Email API authentication failed. Check RESEND_API_KEY in Render environment variables.';
@@ -266,13 +284,8 @@ app.get('/api/config/google-client', (req,res)=>{
     res.json({ clientId: GOOGLE_CLIENT_ID });
 });
 app.get('/api/config/email', (req,res)=>{
-    const provider = hasResendConfig ? 'resend' : hasSmtpConfig ? 'smtp' : null;
-    res.status(provider ? 200 : 503).json({
-        provider,
-        resendApiKeyConfigured: Boolean(RESEND_API_KEY),
-        mailFromConfigured: Boolean(MAIL_FROM),
-        smtpConfigured: hasSmtpConfig
-    });
+    const status = getEmailConfigStatus();
+    res.status(status.provider ? 200 : 503).json(status);
 });
 // Add this to your main server file (e.g., server.js)
 
@@ -543,7 +556,8 @@ app.post('/api/auth/forgot', async (req,res)=>{
                 code: mailErr?.code,
                 responseCode: mailErr?.responseCode,
                 response: mailErr?.response,
-                message: mailErr?.message
+                message: mailErr?.message,
+                emailConfig: getEmailConfigStatus()
             });
             return res.status(502).json({message:getMailErrorMessage(mailErr)});
         }
