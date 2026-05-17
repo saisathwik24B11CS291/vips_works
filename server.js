@@ -111,8 +111,21 @@ function getMailErrorMessage(err){
         return `Email service is not configured on the running server. Missing: ${missing.join(', ') || 'email settings'}. Check Render environment variables, save changes, then redeploy/restart the service.`;
     }
     if (err?.provider === 'resend') {
-        if (err.status === 401 || err.status === 403) {
+        const resendMessage = String(err.message || '');
+        const lowerResendMessage = resendMessage.toLowerCase();
+        if (err.status === 401) {
             return 'Email API authentication failed. Check RESEND_API_KEY in Render environment variables.';
+        }
+        if (err.status === 403) {
+            if (
+                lowerResendMessage.includes('domain') ||
+                lowerResendMessage.includes('sender') ||
+                lowerResendMessage.includes('testing') ||
+                lowerResendMessage.includes('recipient')
+            ) {
+                return resendMessage || 'Resend blocked this email. Verify your sender domain in Resend, then set MAIL_FROM to an address on that verified domain.';
+            }
+            return 'Resend rejected this email request. Check your verified sender/domain and recipient settings in Resend.';
         }
         return err.message || 'Email API could not send OTP. Check your Resend sender/domain settings.';
     }
@@ -570,6 +583,7 @@ app.post('/api/auth/forgot', async (req,res)=>{
                 responseCode: mailErr?.responseCode,
                 response: mailErr?.response,
                 message: mailErr?.message,
+                to: maskEmail(accountEmail),
                 emailConfig: getEmailConfigStatus()
             });
             return res.status(502).json({message:getMailErrorMessage(mailErr)});
