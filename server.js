@@ -458,6 +458,48 @@ async function cleanupExpiredSignupOtps() {
     await PendingSignup.deleteMany({ expiresAt: { $lte: new Date() } });
 }
 
+async function removePendingSignupIndexes() {
+    try {
+        const indexes = await PendingSignup.collection.indexes();
+        for (const index of indexes) {
+            if (index.name === '_id_' || index.name === 'token_1' || index.name === 'expiresAt_1') continue;
+            if (index.key?.email || index.key?.username) {
+                await PendingSignup.collection.dropIndex(index.name);
+            }
+        }
+    } catch (err) {
+        console.warn('Pending signup index cleanup skipped:', err.message);
+    }
+}
+
+async function savePendingSignup(signupToken, pendingSignup) {
+    await PendingSignup.deleteMany({
+        $or: [
+            { email: pendingSignup.email },
+            { username: pendingSignup.username }
+        ]
+    });
+
+    try {
+        return await PendingSignup.create({ token: signupToken, ...pendingSignup });
+    } catch (err) {
+        const isPendingDuplicate =
+            err?.code === 11000 &&
+            String(err?.collection || err?.message || '').toLowerCase().includes('pendingsignups');
+
+        if (!isPendingDuplicate) throw err;
+
+        await removePendingSignupIndexes();
+        await PendingSignup.deleteMany({
+            $or: [
+                { email: pendingSignup.email },
+                { username: pendingSignup.username }
+            ]
+        });
+        return PendingSignup.create({ token: signupToken, ...pendingSignup });
+    }
+}
+
 function createSignupToken() {
     return crypto.randomBytes(32).toString('hex');
 }
@@ -571,6 +613,7 @@ app.post('/api/auth/signup', async (req, res) => {
         if (existingUser) return res.status(400).json({ error: "Email already exists. Please use another email." });
 
         await cleanupExpiredSignupOtps();
+        await removePendingSignupIndexes();
 
         const signupRole = role === 'employer' ? 'employer' : 'worker';
         const code = generateCode();
@@ -587,13 +630,7 @@ app.post('/api/auth/signup', async (req, res) => {
             attempts: 0
         };
 
-        await PendingSignup.deleteMany({
-            $or: [
-                { email: normalizedEmail },
-                { username: normalizedUsername }
-            ]
-        });
-        await PendingSignup.create({ token, ...pendingSignup });
+        await savePendingSignup(token, pendingSignup);
 
         try {
             await sendSignupOtpEmail(normalizedEmail, code, pendingSignup);
@@ -615,6 +652,10 @@ app.post('/api/auth/signup', async (req, res) => {
         console.error("Signup Error:", err);
         if (err?.code === 11000) {
             const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
+            const collectionName = err?.collection || err?.message || '';
+            if (String(collectionName).toLowerCase().includes('pendingsignups')) {
+                return res.status(400).json({ error: "OTP already sent for this signup. Please open the OTP page or try again." });
+            }
             if (field === 'username') {
                 return res.status(400).json({ error: "Change username. It is already used by someone." });
             }
