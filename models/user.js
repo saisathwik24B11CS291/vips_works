@@ -27,7 +27,8 @@ followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
 settings: {
 followToView: { type: Boolean, default: false },
-autoAccept: { type: Boolean, default: false }
+autoAccept: { type: Boolean, default: false },
+language: { type: String, default: 'en' }
 },
 
 mainCategory: String,

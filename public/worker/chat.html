@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -33,7 +33,7 @@
 <body>
 
 <div class="chat-header">
-    <a href="messages.html" class="back-btn">←</a>
+    <a href="messages.html" class="back-btn">â†</a>
     <div class="user-info" id="partner-info">
         <img src="https://via.placeholder.com/35" id="partner-pic">
         <b id="partner-name">Loading...</b>
@@ -43,7 +43,7 @@
 <div id="chat-box"></div>
 
 <div class="input-area">
-    <label for="file-input" class="camera-label">📷</label>
+    <label for="file-input" class="camera-label">ðŸ“·</label>
     <input type="file" id="file-input" hidden accept="image/*" onchange="sendImage(this)">
     
     <div class="input-wrapper">
@@ -73,7 +73,7 @@ async function loadChatDetails() {
         try {
             console.log("Fetching profile for:", partnerId);
             
-            // ✅ FIX 2: Correct Endpoint usage
+            // âœ… FIX 2: Correct Endpoint usage
             const res = await fetch(`${API_BASE}/api/users/profile/${partnerId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -162,7 +162,7 @@ async function markAsRead() {
         const text = input.value.trim();
         if (!text) return;
 
-        // ✅ FIX 3: Safety check
+        // âœ… FIX 3: Safety check
         if (!partnerRole) {
             alert("Wait for profile to load...");
             return;
@@ -193,5 +193,7 @@ async function markAsRead() {
     else window.location.href = 'login.html';
 </script>
 
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

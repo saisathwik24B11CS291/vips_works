@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -114,13 +114,13 @@
 </head>
 <body>
   <div class="container">
-    <a href="javascript:history.back()" id="back-to-search">← Back</a>
+    <a href="javascript:history.back()" id="back-to-search">â† Back</a>
     <div id="vip-status-badge" class="vip-badge">VIP Verified Worker</div>
 
     <div class="main-card">
       <div id="photo-box" class="profile-photo">U</div>
       <div class="profile-info">
-        <h2><span id="profile-name">Loading...</span> <span class="verified-badge">✓ Verified</span></h2>
+        <h2><span id="profile-name">Loading...</span> <span class="verified-badge">âœ“ Verified</span></h2>
         <p class="job-title" id="profile-profession">Professional Specialist</p>
         <div class="stats-bar">
       <div class="stat"><span class="stat-value" id="stat-followers">0</span><span class="stat-label">Followers</span></div>
@@ -132,18 +132,18 @@
         </div>
       </div>
       <div class="action-group" id="owner-actions">
-        <a href="edit-profile.html" class="edit-btn">✎ Edit</a>
-        <a href="settings.html" class="settings-btn">⚙</a>
+        <a href="edit-profile.html" class="edit-btn">âœŽ Edit</a>
+        <a href="settings.html" class="settings-btn">âš™</a>
       </div>
     </div>
 
     <div class="info-grid">
-      <div class="info-item"><div class="info-icon">📞</div><div class="info-content"><label>Phone</label><span id="profile-phone">...</span></div></div>
-      <div class="info-item"><div class="info-icon">✉️</div><div class="info-content"><label>Email</label><span id="profile-email">...</span></div></div>
-      <div class="info-item"><div class="info-icon">📍</div><div class="info-content"><label>Location</label><span id="profile-location">...</span></div></div>
-      <div class="info-item"><div class="info-icon">💼</div><div class="info-content"><label>Exp</label><span id="profile-experience">...</span></div></div>
+      <div class="info-item"><div class="info-icon">ðŸ“ž</div><div class="info-content"><label>Phone</label><span id="profile-phone">...</span></div></div>
+      <div class="info-item"><div class="info-icon">âœ‰ï¸</div><div class="info-content"><label>Email</label><span id="profile-email">...</span></div></div>
+      <div class="info-item"><div class="info-icon">ðŸ“</div><div class="info-content"><label>Location</label><span id="profile-location">...</span></div></div>
+      <div class="info-item"><div class="info-icon">ðŸ’¼</div><div class="info-content"><label>Exp</label><span id="profile-experience">...</span></div></div>
       <div class="info-item full">
-        <div class="info-icon" style="color:var(--accent-green)">💰</div>
+        <div class="info-icon" style="color:var(--accent-green)">ðŸ’°</div>
         <div class="info-content"><label>Hourly Rate</label><span id="profile-rate">Loading...</span></div>
       </div>
     </div>
@@ -157,7 +157,7 @@
 
     <div class="section-head">
       <div>
-        <h3 style="margin:0;">🖼 Portfolio Work</h3>
+        <h3 style="margin:0;">ðŸ–¼ Portfolio Work</h3>
         <p style="margin:4px 0 0 0;color:var(--text-gray);font-size:12px;">Showcase projects with up to 10 photos/videos each.</p>
       </div>
       <button class="ghost-btn" id="add-work-trigger" style="display:none;">+ Add Project</button>
@@ -206,7 +206,7 @@
           <button id="tab-followers" class="active" onclick="setNetworkMode('followers')">Followers</button>
           <button id="tab-following" onclick="setNetworkMode('following')">Following</button>
         </div>
-        <button class="pill" onclick="closeNetwork()">✖</button>
+        <button class="pill" onclick="closeNetwork()">âœ–</button>
       </div>
       <div class="network-search">
         <i class="fas fa-search"></i>
@@ -315,18 +315,18 @@ function drawViewer(){
   viewer.innerHTML = `
     <div class="modal-head">
       <div ondblclick="renameProject(event,'${current._id}','${current.title||'Project'}')"><strong>${current.title||'Project'}</strong> <span style="color:#888;font-size:12px;">${current.media?.length||0}/10</span></div>
-      <button class="topbar-btn" onclick="closeViewer()">✕</button>
+      <button class="topbar-btn" onclick="closeViewer()">âœ•</button>
     </div>
     <div class="modal-main">
-      <button class="nav-btn left" onclick="changeMedia(-1)">◀</button>
+      <button class="nav-btn left" onclick="changeMedia(-1)">â—€</button>
       <div class="modal-media" id="media-slot"></div>
-      <button class="nav-btn right" onclick="changeMedia(1)">▶</button>
+      <button class="nav-btn right" onclick="changeMedia(1)">â–¶</button>
     </div>
     <div class="modal-foot">
       <div id="dotbar"></div>
       <div style="display:flex;gap:8px;align-items:center;">
         ${isOwnerView && (current.media?.length||0)<10?'<button class="pill" onclick="appendMedia()">Add</button>':''}
-        ${isOwnerView?'<button class="pill" onclick="showMenu()">⋯</button>':''}
+        ${isOwnerView?'<button class="pill" onclick="showMenu()">â‹¯</button>':''}
       </div>
     </div>`;
   renderMedia();
@@ -526,8 +526,8 @@ async function loadProfile(){
   document.getElementById('profile-experience').innerText = data.experience||"N/A";
   document.getElementById('profile-rate').innerText = data.hourlyRate ? `$${data.hourlyRate}/hr` : "Negotiable";
   document.getElementById('profile-bio').innerText = data.bio||"No bio available.";
-  document.getElementById('profile-phone').innerText = isLocked ? "🔒 Follow to see" : (data.phone||"N/A");
-  document.getElementById('profile-email').innerText = isLocked ? "🔒 Follow to see" : (data.email||"N/A");
+  document.getElementById('profile-phone').innerText = isLocked ? "ðŸ”’ Follow to see" : (data.phone||"N/A");
+  document.getElementById('profile-email').innerText = isLocked ? "ðŸ”’ Follow to see" : (data.email||"N/A");
 
   if(data.profilePicture){
     document.getElementById('photo-box').innerHTML=`<img src="${API_BASE}${data.profilePicture}" onerror="this.src='https://via.placeholder.com/150';">`;
@@ -798,5 +798,7 @@ document.addEventListener('keydown',(e)=>{
 
 loadProfile();
 </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

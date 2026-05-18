@@ -35,7 +35,8 @@ const EmployerSchema = new mongoose.Schema({
     // --- Privacy Settings ---
     settings: {
         followToView: { type: Boolean, default: true },
-        autoAccept: { type: Boolean, default: false }
+        autoAccept: { type: Boolean, default: false },
+        language: { type: String, default: 'en' }
     },
     
     autoAcceptFollows: { type: Boolean, default: false }, 

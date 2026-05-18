@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -134,16 +134,16 @@
     
     <div class="sidebar" id="sidebar">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 30px;">Menu</div>
-        <a href="edit-profile.html" class="menu-item">👤 Edit Profile</a>
-        <a href="hired-jobs.html" class="menu-item">💼 Hired Jobs</a>
-        <a href="settings.html" class="menu-item">⚙️ Settings</a>
-        <a href="#" onclick="logout()" class="menu-item" style="color:var(--danger); margin-top: 50px;">🚪 Logout</a>
+        <a href="edit-profile.html" class="menu-item">ðŸ‘¤ Edit Profile</a>
+        <a href="hired-jobs.html" class="menu-item">ðŸ’¼ Hired Jobs</a>
+        <a href="settings.html" class="menu-item">âš™ï¸ Settings</a>
+        <a href="#" onclick="logout()" class="menu-item" style="color:var(--danger); margin-top: 50px;">ðŸšª Logout</a>
     </div>
 
     <div class="container">
         <div class="top-nav" id="nav-header">
             <span style="font-weight: bold; color: var(--text-gray);">EMPLOYER PROFILE</span>
-            <button class="menu-trigger" onclick="toggleMenu()">☰</button>
+            <button class="menu-trigger" onclick="toggleMenu()">â˜°</button>
         </div>
 
         <div class="main-card">
@@ -158,29 +158,29 @@
 
             <div class="stats-bar">
                 <div class="stat-item" onclick="openHiredJobs()"><span class="stat-value" id="followers-count">0</span><span class="stat-label">Hired Workers</span></div>
-                <div class="stat-item"><span class="stat-value">⭐ 4.9</span><span class="stat-label">Rating</span></div>
+                <div class="stat-item"><span class="stat-value">â­ 4.9</span><span class="stat-label">Rating</span></div>
                 <div class="stat-item" onclick="openHiredJobs()"><span class="stat-value" id="projects-count">0</span><span class="stat-label">Jobs</span></div>
             </div>
         </div>
 
         <div class="info-grid">
-            <div class="info-item"><div class="info-icon">📍</div><div class="info-content"><label>Location</label><span id="display-location">Loading...</span></div></div>
-            <div class="info-item"><div class="info-icon">📞</div><div class="info-content"><label>Phone</label><span id="display-phone">🔒 Hidden</span></div></div>
+            <div class="info-item"><div class="info-icon">ðŸ“</div><div class="info-content"><label>Location</label><span id="display-location">Loading...</span></div></div>
+            <div class="info-item"><div class="info-icon">ðŸ“ž</div><div class="info-content"><label>Phone</label><span id="display-phone">ðŸ”’ Hidden</span></div></div>
         </div>
 
         <div class="section-card">
-            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">🛠 Skills & Specialties</h3>
+            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">ðŸ›  Skills & Specialties</h3>
             <div class="skills-container" id="skills-list"></div>
         </div>
 
         <div class="section-card">
-            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">📝 About</h3>
+            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">ðŸ“ About</h3>
             <p id="display-bio" style="font-size: 13px; color: var(--text-gray); line-height: 1.5; margin:0;"></p>
         </div>
 
         <div class="section-head">
             <div>
-                <h3 style="margin:0; font-size: 15px;">🖼 Portfolio</h3>
+                <h3 style="margin:0; font-size: 15px;">ðŸ–¼ Portfolio</h3>
                 <p style="margin:4px 0 0 0;color:var(--text-gray);font-size:12px;">Showcase projects with up to 10 photos/videos each.</p>
             </div>
             <button class="ghost-btn" id="add-work-btn" style="display:none;">+ Add Project</button>
@@ -261,7 +261,7 @@
                 document.querySelector('.menu-trigger').style.display = 'none';
                 document.querySelector('.bottom-nav').style.display = 'none';
                 const backBtn = document.createElement('button');
-                backBtn.innerHTML = "← Back";
+                backBtn.innerHTML = "â† Back";
                 backBtn.style.cssText = "background:#1a1a1a; color:white; border:1px solid #333; padding:5px 12px; border-radius:8px;";
                 backBtn.onclick = () => history.back();
                 document.getElementById('nav-header').prepend(backBtn);
@@ -427,18 +427,18 @@
             viewer.innerHTML = `
                 <div class="modal-head">
                   <div ondblclick="renameProject(event,'${current._id}','${current.title||'Project'}')"><strong>${current.title||'Project'}</strong> <span style="color:#888;font-size:12px;">${current.media?.length||0}/10</span></div>
-                  <button class="pill" onclick="closeViewer()">✖</button>
+                  <button class="pill" onclick="closeViewer()">âœ–</button>
                 </div>
                 <div class="modal-main">
-                  <button class="nav-btn left" onclick="changeMedia(-1)">◀</button>
+                  <button class="nav-btn left" onclick="changeMedia(-1)">â—€</button>
                   <div class="modal-media" id="media-slot"></div>
-                  <button class="nav-btn right" onclick="changeMedia(1)">▶</button>
+                  <button class="nav-btn right" onclick="changeMedia(1)">â–¶</button>
                 </div>
                 <div class="modal-foot">
                   <div id="dotbar"></div>
                   <div style="display:flex;gap:8px;align-items:center;">
                     ${isOwnerView && (current.media?.length||0)<10?'<button class="pill" onclick="appendMedia()">Add</button>':''}
-                    ${isOwnerView?'<button class="pill" onclick="showMenu()">⋯</button>':''}
+                    ${isOwnerView?'<button class="pill" onclick="showMenu()">â‹¯</button>':''}
                   </div>
                 </div>`;
             renderMedia();
@@ -654,5 +654,7 @@
 
         window.onload = loadProfile;
     </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

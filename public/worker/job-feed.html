@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -50,7 +50,7 @@
                         <div class="job-card">
                             <div class="job-header">
                                 <p class="job-title">${job.title}</p>
-                                <span class="fee-tag">₹${job.totalFee}</span>
+                                <span class="fee-tag">â‚¹${job.totalFee}</span>
                             </div>
                             <p style="font-size:12px; color:#60a5fa; margin:5px 0;">By ${employerName}</p>
                             <p class="details">${job.details.substring(0, 100)}...</p>
@@ -70,5 +70,7 @@
         function viewJob(id) { window.location.href = `home.html?job=${id}`; }
         window.onload = loadJobs;
     </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

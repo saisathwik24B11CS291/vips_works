@@ -38,6 +38,9 @@ const workerSchema = new mongoose.Schema({
         date: { type: Date, default: Date.now },
         read: { type: Boolean, default: false }
     }],
+    settings: {
+        language: { type: String, default: 'en' }
+    },
     resetCode: { type: String, default: null },
     resetCodeExpires: { type: Date, default: null },
     loginProvider: { type: String, default: 'local' },

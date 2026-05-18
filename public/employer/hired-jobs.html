@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -89,14 +89,14 @@ function renderCurrent(){
         data = jobs.filter(j=>!q || j.title?.toLowerCase().includes(q) || (j.location||'').toLowerCase().includes(q));
         list.innerHTML = data.length ? data.map(j=>{
             const loc = j.location || j.employerId?.location || 'Location not set';
-            const pay = j.totalFee ? `₹${j.totalFee}` : (j.hourlyFee ? `₹${j.hourlyFee}/hr` : 'Budget not set');
+            const pay = j.totalFee ? `â‚¹${j.totalFee}` : (j.hourlyFee ? `â‚¹${j.hourlyFee}/hr` : 'Budget not set');
             const badge = j.status || 'open';
             const date = j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '';
             return `<div class="card">
                 <h4>${j.title}</h4>
-                <div class="muted">📍 ${loc}</div>
-                <div class="muted">💰 ${pay}</div>
-                <div class="muted">📅 ${date}</div>
+                <div class="muted">ðŸ“ ${loc}</div>
+                <div class="muted">ðŸ’° ${pay}</div>
+                <div class="muted">ðŸ“… ${date}</div>
                 <span class="pill ${badge}">${badge}</span>
             </div>`;
         }).join('') : '<p class="empty">No posted jobs.</p>';
@@ -107,7 +107,7 @@ function renderCurrent(){
                 <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
                 <div class="card-body">
                   <h4>${w.username || 'Worker'}</h4>
-                  <div class="muted">📍 ${w.location || 'Location not set'}</div>
+                  <div class="muted">ðŸ“ ${w.location || 'Location not set'}</div>
                   <div class="muted">Role: ${w.role || 'worker'}</div>
                   <div class="row-actions">
                     <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
@@ -123,7 +123,7 @@ function renderCurrent(){
                 <div class="avatar">${w.profilePicture?`<img src="${API_BASE}${w.profilePicture}" onerror="this.src='https://via.placeholder.com/80'">`:(w.username||'U')[0].toUpperCase()}</div>
                 <div class="card-body">
                   <h4>${w.username || 'Worker'}</h4>
-                  <div class="muted">📍 ${w.location || 'Location not set'}</div>
+                  <div class="muted">ðŸ“ ${w.location || 'Location not set'}</div>
                   <div class="muted">Role: ${w.role || 'worker'}</div>
                   <div class="row-actions">
                     <button class="btn-primary" onclick="viewProfile('${w._id}','worker')">View Profile</button>
@@ -207,7 +207,7 @@ function renderCurrent(){
         data = jobs.filter(j=>!q || j.title?.toLowerCase().includes(q) || (j.location||'').toLowerCase().includes(q));
         list.innerHTML = data.length ? data.map(j=>{
             const loc = j.location || j.employerId?.location || 'Location not set';
-            const pay = j.totalFee ? `₹${j.totalFee}` : (j.hourlyFee ? `₹${j.hourlyFee}/hr` : 'Budget not set');
+            const pay = j.totalFee ? `â‚¹${j.totalFee}` : (j.hourlyFee ? `â‚¹${j.hourlyFee}/hr` : 'Budget not set');
             const badge = j.status || 'open';
             const date = j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '';
             return `<div class="card">
@@ -260,7 +260,7 @@ function openJobDetails(job){
     const box=document.getElementById('job-modal');
     const container=document.getElementById('job-modal-content');
     const loc = job.location || job.employerId?.location || 'Location not set';
-    const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : 'Budget not set');
+    const pay = job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : 'Budget not set');
     container.innerHTML=`
       <h3>${job.title||'Job'}</h3>
       <p><strong>Location:</strong> ${loc}</p>
@@ -278,5 +278,7 @@ function closeJobDetails(){
 <div id="job-modal">
   <div class="job-box" id="job-modal-content"></div>
 </div>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

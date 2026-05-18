@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -50,9 +50,9 @@
 <span id="user-location-display" style="display: none;"></span>
 
 <div class="filter-bar">
-    <button class="filter-pill active">☆ Top Rated</button>
-    <button class="filter-pill">📈 Best Price</button>
-    <button class="filter-pill">🎓 Most Experienced</button>
+    <button class="filter-pill active">â˜† Top Rated</button>
+    <button class="filter-pill">ðŸ“ˆ Best Price</button>
+    <button class="filter-pill">ðŸŽ“ Most Experienced</button>
 </div>
 
 <div id="worker-results-container">
@@ -178,7 +178,7 @@ if(w.categories){
                 
                 <div class="worker-main-info" style="flex:1; margin-left:15px;">
                     <h4 style="margin:0; color:#0095f6; font-size:18px;">${w.username || 'Worker'} <i class="fas fa-check-circle" style="font-size:12px;"></i></h4>
-                    <p style="margin:4px 0; font-size:13px; color: white;">⭐ 4.9 <span style="color:#888;">(200+ reviews)</span></p>
+                    <p style="margin:4px 0; font-size:13px; color: white;">â­ 4.9 <span style="color:#888;">(200+ reviews)</span></p>
                     <div style="display:flex; gap:10px; font-size:12px; color:#8b949e; margin-top:8px;">
                         <span><i class="fas fa-briefcase"></i> ${w.experience || '3+'} yrs</span>
                         <span><i class="fas fa-map-marker-alt"></i> ${w.location || 'Location Not Shared'}</span>
@@ -186,7 +186,7 @@ if(w.categories){
                 </div>
 
                 <div style="text-align:right;">
-                    <span style="display:block; color:#00f076; font-weight:bold; font-size:20px;">₹${w.hourlyRate || 0}</span>
+                    <span style="display:block; color:#00f076; font-weight:bold; font-size:20px;">â‚¹${w.hourlyRate || 0}</span>
                     <span style="font-size:11px; color:#8b949e;">per hour</span>
                 </div>
             </div>
@@ -353,7 +353,7 @@ const locationText = localStorage.getItem("userLocation") || "Not specified";
 try{
 
 btn.disabled = true;
-btn.innerHTML = "⏳";
+btn.innerHTML = "â³";
 
 const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"POST",
@@ -395,7 +395,7 @@ const token = localStorage.getItem("token");
 try{
 
 btn.disabled = true;
-btn.innerHTML = "⏳";
+btn.innerHTML = "â³";
 
 const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"DELETE",
@@ -431,5 +431,7 @@ alert("Cancel failed");
     // Run initialization
     initPage();
     </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

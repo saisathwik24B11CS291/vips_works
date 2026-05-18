@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -71,7 +71,7 @@
 
 <div class="search-header">
     <div class="search-bar">
-        <span>🔍</span>
+        <span>ðŸ”</span>
         <input type="text" id="search-input" placeholder="Search workers, employers, posts..." oninput="handleSearch(this.value)">
     </div>
 </div>
@@ -364,11 +364,11 @@ function renderViewerMedia(){
     slot.innerHTML='';
     // add arrows first so they sit above any video controls
     const leftBtn=document.createElement('button');
-    leftBtn.innerText='‹';
+    leftBtn.innerText='â€¹';
     leftBtn.style.cssText="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:20px;width:38px;height:38px;border-radius:50%;cursor:pointer;z-index:5;";
     leftBtn.onclick=()=>changeViewer(-1);
     const rightBtn=document.createElement('button');
-    rightBtn.innerText='›';
+    rightBtn.innerText='â€º';
     rightBtn.style.cssText="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:20px;width:38px;height:38px;border-radius:50%;cursor:pointer;z-index:5;";
     rightBtn.onclick=()=>changeViewer(1);
     slot.appendChild(leftBtn);
@@ -410,16 +410,18 @@ function openProfile(tile){
     window.location.href = `${base}?id=${tile.ownerId}&project=${tile.projectId}`;
 }
 </script>
+
+    <script src="js/i18n.js"></script>
 </body>
 <div id="explore-viewer" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:4000;align-items:center;justify-content:center;">
   <div style="width:92%;max-width:640px;background:#0f0f0f;border:1px solid #222;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <button onclick="closeViewer()" style="background:none;border:none;color:#888;cursor:pointer;font-size:20px;">✕</button>
+      <button onclick="closeViewer()" style="background:none;border:none;color:#888;cursor:pointer;font-size:20px;">âœ•</button>
       <button id="viewer-username" style="background:none;border:none;color:#3b82f6;font-weight:800;cursor:pointer;"></button>
     </div>
     <div id="viewer-media" style="background:#000;border-radius:12px;min-height:320px;display:flex;align-items:center;justify-content:center;position:relative;">
-      <button onclick="changeViewer(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">‹</button>
-      <button onclick="changeViewer(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">›</button>
+      <button onclick="changeViewer(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">â€¹</button>
+      <button onclick="changeViewer(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;font-size:20px;width:34px;height:34px;border-radius:50%;cursor:pointer;">â€º</button>
     </div>
     <div id="viewer-dots" style="text-align:center;"></div>
   </div>

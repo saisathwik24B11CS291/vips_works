@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -59,6 +59,16 @@
 
         .row-label { font-size: 14px; font-weight: 500; }
         .row-info { font-size: 12px; color: var(--text-gray); display: block; margin-top: 2px; }
+        .language-select {
+            width: min(230px, 46vw);
+            background: #0b0b0b;
+            color: white;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+            font-weight: 700;
+        }
 
         /* --- TOGGLE SWITCH --- */
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
@@ -85,7 +95,7 @@
 
     <div class="container">
         <div class="settings-header">
-            <a href="profile.html" class="back-btn">← Back</a>
+            <a href="profile.html" class="back-btn">â† Back</a>
             <h2 style="margin:0;">Settings</h2>
         </div>
 
@@ -93,7 +103,7 @@
         <div class="settings-group">
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">🔒</div>
+                    <div class="icon-box">ðŸ”’</div>
                     <div>
                         <span class="row-label">Follow to View Details</span>
                         <span class="row-info">Workers must follow you to see Phone & Email</span>
@@ -106,7 +116,7 @@
             </div>
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">🤝</div>
+                    <div class="icon-box">ðŸ¤</div>
                     <div>
                         <span class="row-label">Auto-Accept Follow Requests</span>
                         <span class="row-info">Instantly accept worker follow requests</span>
@@ -123,8 +133,18 @@
         <div class="settings-group">
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">🔔</div>
-                    <span class="row-label">Push Notifications</span>
+                    <div class="icon-box">A</div>
+                    <div>
+                        <span class="row-label">App Language</span>
+                        <span class="row-info">Choose the language used across VIPs.</span>
+                    </div>
+                </div>
+                <select id="language-select" class="language-select" data-language-select aria-label="Select Language"></select>
+            </div>
+            <div class="settings-row">
+                <div class="row-left">
+                    <div class="icon-box">ðŸ””</div>
+                        <span class="row-label">Push Notifications</span>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="notifications-toggle" checked>
@@ -137,7 +157,7 @@
         <div class="settings-group">
             <div class="settings-row" onclick="confirmDelete()">
                 <div class="row-left">
-                    <div class="icon-box" style="color:var(--danger)">⚠️</div>
+                    <div class="icon-box" style="color:var(--danger)">âš ï¸</div>
                     <span class="row-label" style="color:var(--danger)">Delete Account</span>
                 </div>
             </div>
@@ -146,6 +166,7 @@
 
     <div id="toast">Settings updated</div>
 
+    <script src="../js/i18n.js"></script>
     <script>
         const API_BASE = window.location.origin;
         const token = localStorage.getItem('token');
@@ -156,7 +177,7 @@
         const toast = document.getElementById('toast');
 
         function showToast(msg) {
-            toast.innerText = msg;
+            toast.innerText = window.VipsI18n ? window.VipsI18n.translate(msg) : msg;
             toast.style.display = 'block';
             setTimeout(() => { toast.style.display = 'none'; }, 2000);
         }
@@ -198,6 +219,10 @@
         notificationToggle.addEventListener('change', () => {
             // Logic for push notifications can be added here
             showToast("Notification preferences updated");
+        });
+
+        window.addEventListener('vips:languagechange', () => {
+            showToast("Language updated");
         });
 
         // --- LOAD FUNCTION ---

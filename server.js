@@ -573,7 +573,7 @@ async function createUserFromSignupData(signupData) {
             phone: signupData.phone,
             role: 'employer',
             companyName: signupData.username,
-            settings: { followToView: false, autoAccept: true },
+            settings: { followToView: false, autoAccept: true, language: 'en' },
             mainCategory: signupData.businessCategory || "General Business"
         });
         return newEmployer.save();
@@ -1041,6 +1041,23 @@ app.get('/api/auth/me', async (req, res) => {
         res.status(401).json({ message: "Invalid token" }); 
     }
 });
+
+app.post('/api/settings/language', authMiddleware, async (req, res) => {
+    try {
+        const allowedLanguages = ['en', 'hi', 'te', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'ur'];
+        const language = allowedLanguages.includes(req.body.language) ? req.body.language : 'en';
+        const Model = req.user.role === 'employer' ? Employer : Worker;
+        const updatedUser = await Model.findByIdAndUpdate(
+            req.user._id,
+            { $set: { 'settings.language': language } },
+            { new: true }
+        );
+        res.json({ message: "Language updated", language, settings: updatedUser.settings || {} });
+    } catch (err) {
+        console.error("Language update failed:", err);
+        res.status(500).json({ message: "Language update failed" });
+    }
+});
 // --- SEARCH & PROFILE ---
 app.get('/api/users/search', async (req, res) => {
     const query = req.query.q || ""; 
@@ -1151,15 +1168,13 @@ app.post('/api/users/follow/:targetId', async (req, res) => {
 app.post('/api/employer/update-privacy', authMiddleware, async (req, res) => {
     try {
         const { followToView, autoAccept } = req.body;
+        const updates = {};
+        if (typeof followToView === 'boolean') updates['settings.followToView'] = followToView;
+        if (typeof autoAccept === 'boolean') updates['settings.autoAccept'] = autoAccept;
         
         const updated = await Employer.findByIdAndUpdate(
             req.user._id, 
-            { 
-                $set: { 
-                    'settings.followToView': followToView,
-                    'settings.autoAccept': autoAccept 
-                } 
-            }, 
+            Object.keys(updates).length ? { $set: updates } : {},
             { new: true }
         );
         

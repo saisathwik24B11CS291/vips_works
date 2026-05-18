@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -603,9 +603,9 @@ return;
 container.innerHTML="";
 
 invites.forEach(invite=>{
-    // ✅ NEW: Get previous location with fallbacks
+    // âœ… NEW: Get previous location with fallbacks
     const jobLoc = invite.jobLocation || invite.workerLocationAtInvite || invite.employerId?.location || "Not specified";
-    const prevLoc = invite.workerLocationAtInvite || invite.jobLocation || invite.employerId?.location || '—';
+    const prevLoc = invite.workerLocationAtInvite || invite.jobLocation || invite.employerId?.location || 'â€”';
 
     // Normalize locations to avoid false mismatch (case/extra text)
     const userLocNorm = document.getElementById('home-location-text').innerText.trim().toLowerCase();
@@ -615,16 +615,16 @@ invites.forEach(invite=>{
 
     container.innerHTML+=`
         <div class="job-card">
-            <!-- ✅ UPDATED: Show snapshot of previous location -->
+            <!-- âœ… UPDATED: Show snapshot of previous location -->
             <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
             
-            <p style="color:#4da6ff;">📍 Job Location: ${jobLoc}</p>
+            <p style="color:#4da6ff;">ðŸ“ Job Location: ${jobLoc}</p>
 
             ${
                 jobLoc !== "Not specified" &&
                 !sameLocation
                 ? `<p style="color:orange; font-size:13px;">
-                        ⚠ You are currently in ${document.getElementById('home-location-text').innerText}
+                        âš  You are currently in ${document.getElementById('home-location-text').innerText}
                    </p>`
                 : ""
             }
@@ -749,7 +749,7 @@ filtered.forEach(invite=>{
         ? employerLocRaw
         : (jobLocRaw || employerLocRaw || workerSnapRaw || "Not specified");
 
-    const prevLoc = workerSnapRaw || jobLocRaw || employerLocRaw || '—';
+    const prevLoc = workerSnapRaw || jobLocRaw || employerLocRaw || 'â€”';
     const userLocNorm = userLocText.trim().toLowerCase();
     const jobLocNorm = (displayJobLoc || "").trim().toLowerCase();
     const employerLocNorm = (invite.employerId?.location || "").trim().toLowerCase();
@@ -778,8 +778,8 @@ filtered.forEach(invite=>{
     container.innerHTML+=`
         <div class="job-card">
             <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
-            <p style="color:#4da6ff;">📍 Job Location: ${displayJobLoc}</p>
-            ${displayJobLoc !== "Not specified" && showAlert ? `<p style="color:orange; font-size:13px;">⚠️ You are currently in ${userLocText}</p>` : ""}
+            <p style="color:#4da6ff;">ðŸ“ Job Location: ${displayJobLoc}</p>
+            ${displayJobLoc !== "Not specified" && showAlert ? `<p style="color:orange; font-size:13px;">âš ï¸ You are currently in ${userLocText}</p>` : ""}
             <p>${invite.employerId?.username || "Employer"}</p>
             <p>${invite.message}</p>
             <div style="display:flex;gap:10px;">${actions}</div>
@@ -904,7 +904,7 @@ document.getElementById('job-detail-title').innerText=job.title||"Job";
 document.getElementById('job-detail-location').innerText=displayLoc;
 document.getElementById('job-detail-employer').innerText=job.employerId?.companyName || job.employerId?.username || "Employer";
 document.getElementById('job-detail-description').innerText=job.details || job.workDetails || "No description provided.";
-document.getElementById('job-detail-pay').innerText=job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Not specified");
+document.getElementById('job-detail-pay').innerText=job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Not specified");
 document.getElementById('job-detail-tasks').innerText=job.tasks || "Not provided";
 document.getElementById('job-detail-modal').style.display='flex';
 }
@@ -1035,7 +1035,7 @@ body:JSON.stringify({location:cityName})
 if(res.ok){
 document.getElementById('home-location-text').innerText=cityName;
 
-// ✅ ADD THIS LINE
+// âœ… ADD THIS LINE
 localStorage.setItem("userLocation", cityName);
 
 toggleLocationPopup(false);
@@ -1044,6 +1044,8 @@ toggleLocationPopup(false);
 }
 </script>
 
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>
 

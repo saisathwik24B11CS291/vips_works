@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -122,7 +122,7 @@
             if(!up) return;
             document.getElementById('modal-title').innerText = up.jobId?.title || 'Job';
             document.getElementById('modal-loc').innerText = `Location: ${up.jobId?.location || up.employerId?.location || 'Not set'}`;
-            const pay = up.jobId?.totalFee ? `₹${up.jobId.totalFee}` : (up.jobId?.hourlyFee ? `₹${up.jobId.hourlyFee}/hr` : 'Budget not set');
+            const pay = up.jobId?.totalFee ? `â‚¹${up.jobId.totalFee}` : (up.jobId?.hourlyFee ? `â‚¹${up.jobId.hourlyFee}/hr` : 'Budget not set');
             document.getElementById('modal-pay').innerText = `Pay: ${pay}`;
             document.getElementById('modal-details').innerText = up.jobId?.details || up.jobId?.workDetails || 'No details provided.';
             document.getElementById('modal-tasks').innerText = up.jobId?.tasks ? `Tasks: ${up.jobId.tasks}` : '';
@@ -152,5 +152,7 @@
         }
         loadUpdates();
     </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>

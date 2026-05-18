@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -297,7 +297,7 @@
 
         <div class="my-jobs-section">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-                <h3 style="margin:0;font-size:15px;">📄 My Posted Jobs</h3>
+                <h3 style="margin:0;font-size:15px;">ðŸ“„ My Posted Jobs</h3>
                 <button onclick="window.location.href='post-job.html'" style="background:#1a1a1a;border:1px solid #333;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;">+ Post Job</button>
             </div>
             <div class="jobs-list" id="my-jobs-list" style="margin-top:12px;">
@@ -535,18 +535,18 @@ function closeSubSection() {
             const list = document.getElementById('my-jobs-list');
             if(!list) return;
             if(!myJobs.length){
-                list.innerHTML = "<p style='color:#888;'>You haven’t posted any jobs yet.</p>";
+                list.innerHTML = "<p style='color:#888;'>You havenâ€™t posted any jobs yet.</p>";
                 return;
             }
             list.innerHTML = myJobs.map((job,idx)=>{
                 const loc = job.location || job.employerId?.location || "Location not set";
-                const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Budget not set");
+                const pay = job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Budget not set");
                 const badge = job.status || "open";
                 return `
                     <div class="job-card">
                         <h4 onclick="showJobDetails(${idx})">${job.title}</h4>
-                        <div class="job-meta">📍 ${loc}</div>
-                        <div class="job-meta">💰 ${pay}</div>
+                        <div class="job-meta">ðŸ“ ${loc}</div>
+                        <div class="job-meta">ðŸ’° ${pay}</div>
                         <span class="badge ${badge}">${badge}</span>
                     </div>
                 `;
@@ -557,7 +557,7 @@ function closeSubSection() {
             const job = myJobs[idx];
             if(!job) return;
             const loc = job.location || job.employerId?.location || "Location not set";
-            const pay = job.totalFee ? `₹${job.totalFee}` : (job.hourlyFee ? `₹${job.hourlyFee}/hr` : "Budget not set");
+            const pay = job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Budget not set");
             document.getElementById('job-detail-title').innerText = job.title || "Job";
             document.getElementById('job-detail-status').innerText = job.status || "open";
             document.getElementById('job-detail-location').innerText = loc;
@@ -669,5 +669,7 @@ function closeSubSection() {
 
         window.onload = () => { loadHeader(); loadMyJobs(); checkRequests(); setInterval(checkRequests, 30000); };
     </script>
+
+    <script src="../js/i18n.js"></script>
 </body>
 </html>
