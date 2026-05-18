@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
@@ -50,7 +50,7 @@ router.get('/conversations', authMiddleware, async (req, res) => {
                 if (partner) {
                     conversationsMap.set(partnerId, {
                         partner: { ...partner, _id: partnerId },
-                        lastMessage: msg.text || (msg.image ? "📷 Photo" : ""),
+                        lastMessage: msg.text || (msg.image ? " Photo" : ""),
                         time: msg.createdAt,
                         isRead: msg.isRead
                     });

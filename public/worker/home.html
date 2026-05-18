@@ -603,9 +603,9 @@ return;
 container.innerHTML="";
 
 invites.forEach(invite=>{
-    // âœ… NEW: Get previous location with fallbacks
+    //  NEW: Get previous location with fallbacks
     const jobLoc = invite.jobLocation || invite.workerLocationAtInvite || invite.employerId?.location || "Not specified";
-    const prevLoc = invite.workerLocationAtInvite || invite.jobLocation || invite.employerId?.location || 'â€”';
+    const prevLoc = invite.workerLocationAtInvite || invite.jobLocation || invite.employerId?.location || '';
 
     // Normalize locations to avoid false mismatch (case/extra text)
     const userLocNorm = document.getElementById('home-location-text').innerText.trim().toLowerCase();
@@ -615,16 +615,16 @@ invites.forEach(invite=>{
 
     container.innerHTML+=`
         <div class="job-card">
-            <!-- âœ… UPDATED: Show snapshot of previous location -->
+            <!--  UPDATED: Show snapshot of previous location -->
             <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
             
-            <p style="color:#4da6ff;">ðŸ“ Job Location: ${jobLoc}</p>
+            <p style="color:#4da6ff;"> Job Location: ${jobLoc}</p>
 
             ${
                 jobLoc !== "Not specified" &&
                 !sameLocation
                 ? `<p style="color:orange; font-size:13px;">
-                        âš  You are currently in ${document.getElementById('home-location-text').innerText}
+                         You are currently in ${document.getElementById('home-location-text').innerText}
                    </p>`
                 : ""
             }
@@ -729,7 +729,7 @@ filtered = filtered.filter(inv=>{
     const status = inv.status || "pending";
     if(inviteFilterStatus==="all") return true;
     if(inviteFilterStatus==="pending") return status==="pending";
-    if(inviteFilterStatus==="accepted") return status==="accepted";
+    if(inviteFilterStatus==="accepted") return status==="accepted" || status==="completed";
     if(inviteFilterStatus==="rejected") return status==="rejected";
     return true;
 });
@@ -749,7 +749,7 @@ filtered.forEach(invite=>{
         ? employerLocRaw
         : (jobLocRaw || employerLocRaw || workerSnapRaw || "Not specified");
 
-    const prevLoc = workerSnapRaw || jobLocRaw || employerLocRaw || 'â€”';
+    const prevLoc = workerSnapRaw || jobLocRaw || employerLocRaw || '';
     const userLocNorm = userLocText.trim().toLowerCase();
     const jobLocNorm = (displayJobLoc || "").trim().toLowerCase();
     const employerLocNorm = (invite.employerId?.location || "").trim().toLowerCase();
@@ -758,7 +758,12 @@ filtered.forEach(invite=>{
     const showAlert = !(sameJobLoc && sameEmployerLoc); // warn if job OR employer location differs from worker
     const status = invite.status || "pending";
     let actions = "";
-    if(status === "accepted"){
+    if(status === "completed"){
+        actions = `
+            <button disabled style="flex:1;background:#422006;color:#fde68a;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Completed</button>
+            <button onclick="reviewInvite('${invite._id}')" style="background:#238636;color:white;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Review</button>
+        `;
+    }else if(status === "accepted"){
         actions = `
             <button disabled style="flex:1;background:#113c1c;color:#8bffd6;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:default;">Accepted</button>
             <button onclick="cancelInvite('${invite._id}')" style="background:#30363d;color:#ff9393;border:none;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
@@ -778,8 +783,8 @@ filtered.forEach(invite=>{
     container.innerHTML+=`
         <div class="job-card">
             <h3>${invite.jobTitle} <span style="font-size:12px;color:#8b949e;">(previous location: ${prevLoc})</span></h3>
-            <p style="color:#4da6ff;">ðŸ“ Job Location: ${displayJobLoc}</p>
-            ${displayJobLoc !== "Not specified" && showAlert ? `<p style="color:orange; font-size:13px;">âš ï¸ You are currently in ${userLocText}</p>` : ""}
+            <p style="color:#4da6ff;"> Job Location: ${displayJobLoc}</p>
+            ${displayJobLoc !== "Not specified" && showAlert ? `<p style="color:orange; font-size:13px;"> You are currently in ${userLocText}</p>` : ""}
             <p>${invite.employerId?.username || "Employer"}</p>
             <p>${invite.message}</p>
             <div style="display:flex;gap:10px;">${actions}</div>
@@ -904,7 +909,7 @@ document.getElementById('job-detail-title').innerText=job.title||"Job";
 document.getElementById('job-detail-location').innerText=displayLoc;
 document.getElementById('job-detail-employer').innerText=job.employerId?.companyName || job.employerId?.username || "Employer";
 document.getElementById('job-detail-description').innerText=job.details || job.workDetails || "No description provided.";
-document.getElementById('job-detail-pay').innerText=job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Not specified");
+document.getElementById('job-detail-pay').innerText=job.totalFee ? `${job.totalFee}` : (job.hourlyFee ? `${job.hourlyFee}/hr` : "Not specified");
 document.getElementById('job-detail-tasks').innerText=job.tasks || "Not provided";
 document.getElementById('job-detail-modal').style.display='flex';
 }
@@ -980,6 +985,23 @@ function undoInvite(id){
     }).then(() => loadJobInvites()).catch(()=>{});
 }
 
+async function reviewInvite(id){
+    const rating = Number(prompt("Rate this employer from 1 to 5", "5"));
+    if(!Number.isInteger(rating) || rating < 1 || rating > 5){
+        alert("Please enter a rating from 1 to 5.");
+        return;
+    }
+    const text = prompt("Write a short review", "") || "";
+    const res = await fetch(`${API_BASE}/api/reviews`,{
+        method:"POST",
+        headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify({sourceType:"invite",sourceId:id,rating,text})
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) alert(data.message || "Review failed");
+    else alert("Review saved");
+}
+
 function toggleLocationPopup(isOpen){
 const modal=document.getElementById('city-modal');
 
@@ -1035,7 +1057,7 @@ body:JSON.stringify({location:cityName})
 if(res.ok){
 document.getElementById('home-location-text').innerText=cityName;
 
-// âœ… ADD THIS LINE
+//  ADD THIS LINE
 localStorage.setItem("userLocation", cityName);
 
 toggleLocationPopup(false);

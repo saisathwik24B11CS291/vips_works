@@ -26,7 +26,7 @@
 <body>
 
 <div class="chat-header">
-    <a href="javascript:void(0)" onclick="goBackToProfile()" class="back-btn">â†</a>
+    <a href="javascript:void(0)" onclick="goBackToProfile()" class="back-btn"></a>
     <div class="user-info" id="partner-info">
         <img src="https://via.placeholder.com/35" id="partner-pic">
         <b id="partner-name">Loading...</b>
@@ -35,7 +35,7 @@
 <div id="chat-box"></div>
 
 <div class="input-area">
-    <label for="file-input" class="camera-label">ðŸ“·</label>
+    <label for="file-input" class="camera-label"></label>
     <input type="file" id="file-input" hidden accept="image/*" onchange="sendImage(this)">
     <div class="input-wrapper">
         <input type="text" id="message-input" placeholder="Message..." onkeypress="if(event.key === 'Enter') sendMessage()">
@@ -112,7 +112,7 @@
                     ${m.text ? `<div>${m.text}</div>` : ''}
                     ${m.sender === myId ? `
                         <div style="font-size: 10px; text-align: right; opacity: 0.6; margin-top: 4px;">
-                            ${m.read ? 'Seen âœ“âœ“' : 'Sent âœ“'} 
+                            ${m.read ? 'Seen ' : 'Sent '}
                         </div>
                     ` : ''}
                 </div>

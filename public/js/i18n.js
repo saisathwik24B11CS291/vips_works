@@ -1,423 +1,246 @@
 (function () {
   const STORAGE_KEY = "vips.language";
   const DEFAULT_LANGUAGE = "en";
+  const neverTranslate = new Set(["Email", "Username", "User Name", "Name", "Phone"]);
 
   const languages = [
     { code: "en", nativeName: "English", englishName: "English" },
-    { code: "hi", nativeName: "हिन्दी", englishName: "Hindi" },
-    { code: "te", nativeName: "తెలుగు", englishName: "Telugu" },
-    { code: "ta", nativeName: "தமிழ்", englishName: "Tamil" },
-    { code: "kn", nativeName: "ಕನ್ನಡ", englishName: "Kannada" },
-    { code: "ml", nativeName: "മലയാളം", englishName: "Malayalam" },
-    { code: "mr", nativeName: "मराठी", englishName: "Marathi" },
-    { code: "bn", nativeName: "বাংলা", englishName: "Bengali" },
-    { code: "gu", nativeName: "ગુજરાતી", englishName: "Gujarati" },
-    { code: "ur", nativeName: "اردو", englishName: "Urdu" }
+    { code: "hi", nativeName: "\u0939\u093f\u0928\u094d\u0926\u0940", englishName: "Hindi" },
+    { code: "te", nativeName: "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41", englishName: "Telugu" },
+    { code: "ta", nativeName: "\u0ba4\u0bae\u0bbf\u0bb4\u0bcd", englishName: "Tamil" },
+    { code: "kn", nativeName: "\u0c95\u0ca8\u0ccd\u0ca8\u0ca1", englishName: "Kannada" },
+    { code: "ml", nativeName: "\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02", englishName: "Malayalam" },
+    { code: "mr", nativeName: "\u092e\u0930\u093e\u0920\u0940", englishName: "Marathi" },
+    { code: "bn", nativeName: "\u09ac\u09be\u0982\u09b2\u09be", englishName: "Bengali" },
+    { code: "gu", nativeName: "\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0", englishName: "Gujarati" },
+    { code: "ur", nativeName: "\u0627\u0631\u062f\u0648", englishName: "Urdu" }
   ];
 
+  const hi = {
+    "Settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938",
+    "Back": "\u0935\u093e\u092a\u0938",
+    "Language": "\u092d\u093e\u0937\u093e",
+    "App Language": "\u090f\u092a \u092d\u093e\u0937\u093e",
+    "Choose the language used across VIPs.": "VIPs \u092e\u0947\u0902 \u0907\u0938\u094d\u0924\u0947\u092e\u093e\u0932 \u0939\u094b\u0928\u0947 \u0935\u093e\u0932\u0940 \u092d\u093e\u0937\u093e \u091a\u0941\u0928\u0947\u0902\u0964",
+    "Select Language": "\u092d\u093e\u0937\u093e \u091a\u0941\u0928\u0947\u0902",
+    "Language updated": "\u092d\u093e\u0937\u093e \u0905\u092a\u0921\u0947\u091f \u0939\u0941\u0908",
+    "Settings updated": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938 \u0905\u092a\u0921\u0947\u091f \u0939\u0941\u0908",
+    "Settings updated successfully": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938 \u0938\u092b\u0932\u0924\u093e\u092a\u0942\u0930\u094d\u0935\u0915 \u0905\u092a\u0921\u0947\u091f \u0939\u0941\u0908",
+    "Error saving settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938 \u0938\u0947\u0935 \u0928\u0939\u0940\u0902 \u0939\u0941\u0908",
+    "Server connection failed": "\u0938\u0930\u094d\u0935\u0930 \u0915\u0928\u0947\u0915\u094d\u0936\u0928 \u0935\u093f\u092b\u0932",
+    "Preferences": "\u092a\u0938\u0902\u0926",
+    "Privacy & Connections": "\u0917\u094b\u092a\u0928\u0940\u092f\u0924\u093e \u0914\u0930 \u0915\u0928\u0947\u0915\u094d\u0936\u0928",
+    "Follow to View Details": "\u0935\u093f\u0935\u0930\u0923 \u0926\u0947\u0916\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u092b\u0949\u0932\u094b",
+    "Workers must follow you to see Phone & Email": "\u092b\u094b\u0928 \u0914\u0930 \u0908\u092e\u0947\u0932 \u0926\u0947\u0916\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0935\u0930\u094d\u0915\u0930\u094d\u0938 \u0915\u094b \u0906\u092a\u0915\u094b \u092b\u0949\u0932\u094b \u0915\u0930\u0928\u093e \u0939\u094b\u0917\u093e",
+    "Auto-Accept Follow Requests": "\u092b\u0949\u0932\u094b \u0905\u0928\u0941\u0930\u094b\u0927 \u0905\u092a\u0928\u0947-\u0906\u092a \u0938\u094d\u0935\u0940\u0915\u093e\u0930 \u0915\u0930\u0947\u0902",
+    "Instantly accept worker follow requests": "\u0935\u0930\u094d\u0915\u0930 \u092b\u0949\u0932\u094b \u0905\u0928\u0941\u0930\u094b\u0927 \u0924\u0941\u0930\u0902\u0924 \u0938\u094d\u0935\u0940\u0915\u093e\u0930 \u0915\u0930\u0947\u0902",
+    "Danger Zone": "\u0938\u093e\u0935\u0927\u093e\u0928\u0940 \u0915\u094d\u0937\u0947\u0924\u094d\u0930",
+    "Account": "\u0916\u093e\u0924\u093e",
+    "Delete Account": "\u0916\u093e\u0924\u093e \u0939\u091f\u093e\u090f\u0902",
+    "Logout": "\u0932\u0949\u0917\u0906\u0909\u091f",
+    "Are you sure you want to logout?": "\u0915\u094d\u092f\u093e \u0906\u092a \u0938\u091a \u092e\u0947\u0902 \u0932\u0949\u0917\u0906\u0909\u091f \u0915\u0930\u0928\u093e \u091a\u093e\u0939\u0924\u0947 \u0939\u0948\u0902?",
+    "Notifications": "\u0938\u0942\u091a\u0928\u093e\u090f\u0902",
+    "Notifications (Soon)": "\u0938\u0942\u091a\u0928\u093e\u090f\u0902 (\u091c\u0932\u094d\u0926)",
+    "Push Notifications": "\u092a\u0941\u0936 \u0938\u0942\u091a\u0928\u093e\u090f\u0902",
+    "Notification preferences updated": "\u0938\u0942\u091a\u0928\u093e \u092a\u0938\u0902\u0926 \u0905\u092a\u0921\u0947\u091f \u0939\u0941\u0908",
+    "Jobs For You": "\u0906\u092a\u0915\u0947 \u0932\u093f\u090f \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902",
+    "Job": "\u0928\u094c\u0915\u0930\u0940",
+    "Jobs": "\u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902",
+    "Invited": "\u0906\u092e\u0902\u0924\u094d\u0930\u093f\u0924",
+    "Posted": "\u092a\u094b\u0938\u094d\u091f \u0915\u0940 \u0917\u0908",
+    "Search invited jobs": "\u0906\u092e\u0902\u0924\u094d\u0930\u093f\u0924 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902 \u0916\u094b\u091c\u0947\u0902",
+    "Search posted jobs": "\u092a\u094b\u0938\u094d\u091f \u0915\u0940 \u0917\u0908 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902 \u0916\u094b\u091c\u0947\u0902",
+    "Find Services": "\u0938\u0947\u0935\u093e\u090f\u0902 \u0916\u094b\u091c\u0947\u0902",
+    "Post a Job": "\u0928\u094c\u0915\u0930\u0940 \u092a\u094b\u0938\u094d\u091f \u0915\u0930\u0947\u0902",
+    "Post Job": "\u0928\u094c\u0915\u0930\u0940 \u092a\u094b\u0938\u094d\u091f \u0915\u0930\u0947\u0902",
+    "Add Post": "\u092a\u094b\u0938\u094d\u091f \u091c\u094b\u0921\u093c\u0947\u0902",
+    "Post a job": "\u0928\u094c\u0915\u0930\u0940 \u092a\u094b\u0938\u094d\u091f \u0915\u0930\u0947\u0902",
+    "My Posted Jobs": "\u092e\u0947\u0930\u0940 \u092a\u094b\u0938\u094d\u091f \u0915\u0940 \u0917\u0908 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902",
+    "Search for services or your posts...": "\u0938\u0947\u0935\u093e\u090f\u0902 \u092f\u093e \u0905\u092a\u0928\u0940 \u092a\u094b\u0938\u094d\u091f \u0916\u094b\u091c\u0947\u0902...",
+    "Category": "\u0936\u094d\u0930\u0947\u0923\u0940",
+    "Category Jobs": "\u0936\u094d\u0930\u0947\u0923\u0940 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902",
+    "Category Title": "\u0936\u094d\u0930\u0947\u0923\u0940 \u0936\u0940\u0930\u094d\u0937\u0915",
+    "General Labour": "\u0938\u093e\u092e\u093e\u0928\u094d\u092f \u092e\u091c\u0926\u0942\u0930\u0940",
+    "General Labour / Helpers": "\u0938\u093e\u092e\u093e\u0928\u094d\u092f \u092e\u091c\u0926\u0942\u0930 / \u0938\u0939\u093e\u092f\u0915",
+    "Loading": "\u0932\u094b\u0921\u093f\u0902\u0917",
+    "Cleaning": "\u0938\u092b\u093e\u0908",
+    "Helper": "\u0938\u0939\u093e\u092f\u0915",
+    "Delivery": "\u0921\u093f\u0932\u0940\u0935\u0930\u0940",
+    "Delivery & Transport": "\u0921\u093f\u0932\u0940\u0935\u0930\u0940 \u0914\u0930 \u092a\u0930\u093f\u0935\u0939\u0928",
+    "Food & Restaurant": "\u092b\u0942\u0921 \u0914\u0930 \u0930\u0947\u0938\u094d\u091f\u094b\u0930\u0947\u0902\u091f",
+    "Grocery Delivery": "\u0915\u093f\u0930\u093e\u0928\u093e \u0921\u093f\u0932\u0940\u0935\u0930\u0940",
+    "Medical & Pharmaceutical": "\u092e\u0947\u0921\u093f\u0915\u0932 \u0914\u0930 \u092b\u093e\u0930\u094d\u092e\u093e",
+    "Long-Distance Trucking": "\u0932\u0902\u092c\u0940 \u0926\u0942\u0930\u0940 \u091f\u094d\u0930\u0915\u093f\u0902\u0917",
+    "Skilled Workers": "\u0915\u0941\u0936\u0932 \u0935\u0930\u094d\u0915\u0930\u094d\u0938",
+    "skill": "\u0915\u094c\u0936\u0932",
+    "Electrician": "\u0907\u0932\u0947\u0915\u094d\u091f\u094d\u0930\u0940\u0936\u093f\u092f\u0928",
+    "Plumber": "\u092a\u094d\u0932\u0902\u092c\u0930",
+    "Carpenter": "\u092c\u0922\u093c\u0908",
+    "Welder": "\u0935\u0947\u0932\u094d\u0921\u0930",
+    "Location": "\u0938\u094d\u0925\u093e\u0928",
+    "Select Your City": "\u0905\u092a\u0928\u093e \u0936\u0939\u0930 \u091a\u0941\u0928\u0947\u0902",
+    "Search city...": "\u0936\u0939\u0930 \u0916\u094b\u091c\u0947\u0902...",
+    "Search for your city...": "\u0905\u092a\u0928\u093e \u0936\u0939\u0930 \u0916\u094b\u091c\u0947\u0902...",
+    "Detect My Location": "\u092e\u0947\u0930\u093e \u0938\u094d\u0925\u093e\u0928 \u092a\u0939\u091a\u093e\u0928\u0947\u0902",
+    "Detecting...": "\u092a\u0939\u091a\u093e\u0928\u093e \u091c\u093e \u0930\u0939\u093e \u0939\u0948...",
+    "Select City": "\u0936\u0939\u0930 \u091a\u0941\u0928\u0947\u0902",
+    "Apply": "\u0906\u0935\u0947\u0926\u0928 \u0915\u0930\u0947\u0902",
+    "Applied": "\u0906\u0935\u0947\u0926\u0928 \u0915\u093f\u092f\u093e",
+    "Accept": "\u0938\u094d\u0935\u0940\u0915\u093e\u0930",
+    "Reject": "\u0905\u0938\u094d\u0935\u0940\u0915\u093e\u0930",
+    "Accepted": "\u0938\u094d\u0935\u0940\u0915\u093e\u0930 \u0915\u093f\u092f\u093e",
+    "Rejected": "\u0905\u0938\u094d\u0935\u0940\u0915\u093e\u0930 \u0915\u093f\u092f\u093e",
+    "Cancel": "\u0930\u0926\u094d\u0926",
+    "Undo": "\u0935\u093e\u092a\u0938",
+    "View details": "\u0935\u093f\u0935\u0930\u0923 \u0926\u0947\u0916\u0947\u0902",
+    "Close": "\u092c\u0902\u0926",
+    "Status": "\u0938\u094d\u0925\u093f\u0924\u093f",
+    "Budget": "\u092c\u091c\u091f",
+    "Details": "\u0935\u093f\u0935\u0930\u0923",
+    "Tasks": "\u0915\u093e\u0930\u094d\u092f",
+    "Posted on": "\u092a\u094b\u0938\u094d\u091f \u0915\u093f\u092f\u093e",
+    "No description provided.": "\u0915\u094b\u0908 \u0935\u093f\u0935\u0930\u0923 \u0928\u0939\u0940\u0902 \u0926\u093f\u092f\u093e\u0964",
+    "Not provided": "\u0928\u0939\u0940\u0902 \u0926\u093f\u092f\u093e",
+    "Not specified": "\u0928\u093f\u0930\u094d\u0926\u093f\u0937\u094d\u091f \u0928\u0939\u0940\u0902",
+    "Not available": "\u0909\u092a\u0932\u092c\u094d\u0927 \u0928\u0939\u0940\u0902",
+    "Location not set": "\u0938\u094d\u0925\u093e\u0928 \u0938\u0947\u091f \u0928\u0939\u0940\u0902",
+    "Budget not set": "\u092c\u091c\u091f \u0938\u0947\u091f \u0928\u0939\u0940\u0902",
+    "Loading...": "\u0932\u094b\u0921 \u0939\u094b \u0930\u0939\u093e \u0939\u0948...",
+    "Loading jobs...": "\u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902 \u0932\u094b\u0921 \u0939\u094b \u0930\u0939\u0940 \u0939\u0948\u0902...",
+    "Failed to load jobs": "\u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902 \u0932\u094b\u0921 \u0928\u0939\u0940\u0902 \u0939\u0941\u0908\u0902",
+    "Failed to load your jobs.": "\u0906\u092a\u0915\u0940 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902 \u0932\u094b\u0921 \u0928\u0939\u0940\u0902 \u0939\u0941\u0908\u0902\u0964",
+    "You havent posted any jobs yet.": "\u0906\u092a\u0928\u0947 \u0905\u092d\u0940 \u0915\u094b\u0908 \u0928\u094c\u0915\u0930\u0940 \u092a\u094b\u0938\u094d\u091f \u0928\u0939\u0940\u0902 \u0915\u0940\u0964",
+    "Profile": "\u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932",
+    "Edit Profile": "\u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932 \u0938\u0902\u092a\u093e\u0926\u093f\u0924 \u0915\u0930\u0947\u0902",
+    "Hired Jobs": "\u0939\u093e\u092f\u0930 \u0915\u0940 \u0917\u0908 \u0928\u094c\u0915\u0930\u093f\u092f\u093e\u0902",
+    "Message": "\u0938\u0902\u0926\u0947\u0936",
+    "Menu": "\u092e\u0947\u0928\u0942",
+    "Follow": "\u092b\u0949\u0932\u094b",
+    "Following": "\u092b\u0949\u0932\u094b \u0915\u0930 \u0930\u0939\u0947",
+    "Followers": "\u092b\u0949\u0932\u094b\u0905\u0930\u094d\u0938",
+    "open": "\u0916\u0941\u0932\u093e",
+    "closed": "\u092c\u0902\u0926",
+    "draft": "\u0921\u094d\u0930\u093e\u092b\u094d\u091f"
+  };
+
+  const te = {
+    "Settings": "\u0c38\u0c46\u0c1f\u0c4d\u0c1f\u0c3f\u0c02\u0c17\u0c4d\u0c38\u0c4d",
+    "Back": "\u0c35\u0c46\u0c28\u0c15\u0c4d\u0c15\u0c3f",
+    "Language": "\u0c2d\u0c3e\u0c37",
+    "App Language": "\u0c2f\u0c3e\u0c2a\u0c4d \u0c2d\u0c3e\u0c37",
+    "Choose the language used across VIPs.": "VIPs \u0c05\u0c02\u0c24\u0c1f\u0c3e \u0c09\u0c2a\u0c2f\u0c4b\u0c17\u0c3f\u0c02\u0c1a\u0c47 \u0c2d\u0c3e\u0c37\u0c28\u0c41 \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f.",
+    "Select Language": "\u0c2d\u0c3e\u0c37 \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f",
+    "Language updated": "\u0c2d\u0c3e\u0c37 \u0c05\u0c2a\u0c4d\u0c21\u0c47\u0c1f\u0c4d \u0c05\u0c2f\u0c3f\u0c02\u0c26\u0c3f",
+    "Settings updated": "\u0c38\u0c46\u0c1f\u0c4d\u0c1f\u0c3f\u0c02\u0c17\u0c4d\u0c38\u0c4d \u0c05\u0c2a\u0c4d\u0c21\u0c47\u0c1f\u0c4d \u0c05\u0c2f\u0c4d\u0c2f\u0c3e\u0c2f\u0c3f",
+    "Settings updated successfully": "\u0c38\u0c46\u0c1f\u0c4d\u0c1f\u0c3f\u0c02\u0c17\u0c4d\u0c38\u0c4d \u0c35\u0c3f\u0c1c\u0c2f\u0c35\u0c02\u0c24\u0c02\u0c17\u0c3e \u0c05\u0c2a\u0c4d\u0c21\u0c47\u0c1f\u0c4d \u0c05\u0c2f\u0c4d\u0c2f\u0c3e\u0c2f\u0c3f",
+    "Error saving settings": "\u0c38\u0c46\u0c1f\u0c4d\u0c1f\u0c3f\u0c02\u0c17\u0c4d\u0c38\u0c4d \u0c38\u0c47\u0c35\u0c4d \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41",
+    "Server connection failed": "\u0c38\u0c30\u0c4d\u0c35\u0c30\u0c4d \u0c15\u0c28\u0c46\u0c15\u0c4d\u0c37\u0c28\u0c4d \u0c35\u0c3f\u0c2b\u0c32\u0c2e\u0c48\u0c02\u0c26\u0c3f",
+    "Preferences": "\u0c2a\u0c4d\u0c30\u0c3f\u0c2b\u0c30\u0c46\u0c28\u0c4d\u0c38\u0c41\u0c32\u0c41",
+    "Privacy & Connections": "\u0c17\u0c4b\u0c2a\u0c4d\u0c2f\u0c24 & \u0c15\u0c28\u0c46\u0c15\u0c4d\u0c37\u0c28\u0c4d\u0c38\u0c4d",
+    "Follow to View Details": "\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c1a\u0c42\u0c21\u0c1f\u0c3e\u0c28\u0c3f\u0c15\u0c3f \u0c2b\u0c3e\u0c32\u0c4b",
+    "Workers must follow you to see Phone & Email": "\u0c2b\u0c4b\u0c28\u0c4d & \u0c08\u0c2e\u0c46\u0c2f\u0c3f\u0c32\u0c4d \u0c1a\u0c42\u0c21\u0c1f\u0c3e\u0c28\u0c3f\u0c15\u0c3f \u0c35\u0c30\u0c4d\u0c15\u0c30\u0c4d\u0c32\u0c41 \u0c2e\u0c3f\u0c2e\u0c4d\u0c2e\u0c32\u0c4d\u0c28\u0c3f \u0c2b\u0c3e\u0c32\u0c4b \u0c05\u0c35\u0c4d\u0c35\u0c3e\u0c32\u0c3f",
+    "Auto-Accept Follow Requests": "\u0c2b\u0c3e\u0c32\u0c4b \u0c30\u0c3f\u0c15\u0c4d\u0c35\u0c46\u0c38\u0c4d\u0c1f\u0c41\u0c32\u0c28\u0c41 \u0c06\u0c1f\u0c4b\u0c2e\u0c47\u0c1f\u0c3f\u0c15\u0c4d\u0c17\u0c3e \u0c05\u0c02\u0c17\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Instantly accept worker follow requests": "\u0c35\u0c30\u0c4d\u0c15\u0c30\u0c4d \u0c2b\u0c3e\u0c32\u0c4b \u0c30\u0c3f\u0c15\u0c4d\u0c35\u0c46\u0c38\u0c4d\u0c1f\u0c41\u0c32\u0c28\u0c41 \u0c35\u0c46\u0c02\u0c1f\u0c28\u0c47 \u0c05\u0c02\u0c17\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Danger Zone": "\u0c1c\u0c3e\u0c17\u0c4d\u0c30\u0c24\u0c4d\u0c24 \u0c2a\u0c4d\u0c30\u0c3e\u0c02\u0c24\u0c02",
+    "Account": "\u0c16\u0c3e\u0c24\u0c3e",
+    "Delete Account": "\u0c16\u0c3e\u0c24\u0c3e\u0c28\u0c41 \u0c24\u0c4a\u0c32\u0c17\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Logout": "\u0c32\u0c3e\u0c17\u0c4c\u0c1f\u0c4d",
+    "Are you sure you want to logout?": "\u0c2e\u0c40\u0c30\u0c41 \u0c28\u0c3f\u0c1c\u0c02\u0c17\u0c3e \u0c32\u0c3e\u0c17\u0c4c\u0c1f\u0c4d \u0c15\u0c3e\u0c35\u0c3e\u0c32\u0c28\u0c41\u0c15\u0c41\u0c02\u0c1f\u0c41\u0c28\u0c4d\u0c28\u0c3e\u0c30\u0c3e?",
+    "Notifications": "\u0c28\u0c4b\u0c1f\u0c3f\u0c2b\u0c3f\u0c15\u0c47\u0c37\u0c28\u0c4d\u0c38\u0c4d",
+    "Notifications (Soon)": "\u0c28\u0c4b\u0c1f\u0c3f\u0c2b\u0c3f\u0c15\u0c47\u0c37\u0c28\u0c4d\u0c38\u0c4d (\u0c24\u0c4d\u0c35\u0c30\u0c32\u0c4b)",
+    "Push Notifications": "\u0c2a\u0c41\u0c37\u0c4d \u0c28\u0c4b\u0c1f\u0c3f\u0c2b\u0c3f\u0c15\u0c47\u0c37\u0c28\u0c4d\u0c38\u0c4d",
+    "Notification preferences updated": "\u0c28\u0c4b\u0c1f\u0c3f\u0c2b\u0c3f\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c2a\u0c4d\u0c30\u0c3f\u0c2b\u0c30\u0c46\u0c28\u0c4d\u0c38\u0c41\u0c32\u0c41 \u0c05\u0c2a\u0c4d\u0c21\u0c47\u0c1f\u0c4d \u0c05\u0c2f\u0c4d\u0c2f\u0c3e\u0c2f\u0c3f",
+    "Jobs For You": "\u0c2e\u0c40 \u0c15\u0c4b\u0c38\u0c02 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41",
+    "Job": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c02",
+    "Jobs": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41",
+    "Invited": "\u0c06\u0c39\u0c4d\u0c35\u0c3e\u0c28\u0c3e\u0c32\u0c41",
+    "Posted": "\u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c38\u0c3f\u0c28\u0c35\u0c3f",
+    "Search invited jobs": "\u0c06\u0c39\u0c4d\u0c35\u0c3e\u0c28 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c35\u0c46\u0c24\u0c15\u0c02\u0c21\u0c3f",
+    "Search posted jobs": "\u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c38\u0c3f\u0c28 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c35\u0c46\u0c24\u0c15\u0c02\u0c21\u0c3f",
+    "Find Services": "\u0c38\u0c47\u0c35\u0c32\u0c41 \u0c15\u0c28\u0c41\u0c17\u0c4a\u0c28\u0c02\u0c21\u0c3f",
+    "Post a Job": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c02 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Post Job": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c02 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Add Post": "\u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1c\u0c4b\u0c21\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Post a job": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c02 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "My Posted Jobs": "\u0c28\u0c47\u0c28\u0c41 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c38\u0c3f\u0c28 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41",
+    "Search for services or your posts...": "\u0c38\u0c47\u0c35\u0c32\u0c41 \u0c32\u0c47\u0c26\u0c3e \u0c2e\u0c40 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c41\u0c32\u0c41 \u0c35\u0c46\u0c24\u0c15\u0c02\u0c21\u0c3f...",
+    "Category": "\u0c35\u0c30\u0c4d\u0c17\u0c02",
+    "Category Jobs": "\u0c35\u0c30\u0c4d\u0c17\u0c02 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41",
+    "Category Title": "\u0c35\u0c30\u0c4d\u0c17\u0c02 \u0c36\u0c40\u0c30\u0c4d\u0c37\u0c3f\u0c15",
+    "General Labour": "\u0c38\u0c3e\u0c27\u0c3e\u0c30\u0c23 \u0c15\u0c3e\u0c30\u0c4d\u0c2e\u0c3f\u0c15\u0c41\u0c32\u0c41",
+    "General Labour / Helpers": "\u0c38\u0c3e\u0c27\u0c3e\u0c30\u0c23 \u0c15\u0c3e\u0c30\u0c4d\u0c2e\u0c3f\u0c15\u0c41\u0c32\u0c41 / \u0c38\u0c39\u0c3e\u0c2f\u0c15\u0c41\u0c32\u0c41",
+    "Loading": "\u0c32\u0c4b\u0c21\u0c3f\u0c02\u0c17\u0c4d",
+    "Cleaning": "\u0c36\u0c41\u0c2d\u0c4d\u0c30\u0c02 \u0c1a\u0c47\u0c2f\u0c21\u0c02",
+    "Helper": "\u0c38\u0c39\u0c3e\u0c2f\u0c15\u0c41\u0c21\u0c41",
+    "Delivery": "\u0c21\u0c46\u0c32\u0c3f\u0c35\u0c30\u0c40",
+    "Delivery & Transport": "\u0c21\u0c46\u0c32\u0c3f\u0c35\u0c30\u0c40 & \u0c30\u0c35\u0c3e\u0c23\u0c3e",
+    "Food & Restaurant": "\u0c2b\u0c41\u0c21\u0c4d & \u0c30\u0c46\u0c38\u0c4d\u0c1f\u0c3e\u0c30\u0c46\u0c02\u0c1f\u0c4d",
+    "Grocery Delivery": "\u0c15\u0c3f\u0c30\u0c3e\u0c23\u0c3e \u0c21\u0c46\u0c32\u0c3f\u0c35\u0c30\u0c40",
+    "Medical & Pharmaceutical": "\u0c35\u0c48\u0c26\u0c4d\u0c2f & \u0c2b\u0c3e\u0c30\u0c4d\u0c2e\u0c3e",
+    "Long-Distance Trucking": "\u0c26\u0c42\u0c30 \u0c1f\u0c4d\u0c30\u0c15\u0c4d\u0c15\u0c3f\u0c02\u0c17\u0c4d",
+    "Skilled Workers": "\u0c28\u0c48\u0c2a\u0c41\u0c23\u0c4d\u0c2f\u0c02 \u0c09\u0c28\u0c4d\u0c28 \u0c35\u0c30\u0c4d\u0c15\u0c30\u0c4d\u0c32\u0c41",
+    "skill": "\u0c28\u0c48\u0c2a\u0c41\u0c23\u0c4d\u0c2f\u0c02",
+    "Electrician": "\u0c0e\u0c32\u0c46\u0c15\u0c4d\u0c1f\u0c4d\u0c30\u0c40\u0c37\u0c3f\u0c2f\u0c28\u0c4d",
+    "Plumber": "\u0c2a\u0c4d\u0c32\u0c02\u0c2c\u0c30\u0c4d",
+    "Carpenter": "\u0c15\u0c3e\u0c30\u0c4d\u0c2a\u0c46\u0c02\u0c1f\u0c30\u0c4d",
+    "Welder": "\u0c35\u0c46\u0c32\u0c4d\u0c21\u0c30\u0c4d",
+    "Location": "\u0c38\u0c4d\u0c25\u0c3e\u0c28\u0c02",
+    "Select Your City": "\u0c2e\u0c40 \u0c28\u0c17\u0c30\u0c3e\u0c28\u0c4d\u0c28\u0c3f \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f",
+    "Search city...": "\u0c28\u0c17\u0c30\u0c02 \u0c35\u0c46\u0c24\u0c15\u0c02\u0c21\u0c3f...",
+    "Search for your city...": "\u0c2e\u0c40 \u0c28\u0c17\u0c30\u0c02 \u0c35\u0c46\u0c24\u0c15\u0c02\u0c21\u0c3f...",
+    "Detect My Location": "\u0c28\u0c3e \u0c38\u0c4d\u0c25\u0c3e\u0c28\u0c02 \u0c17\u0c41\u0c30\u0c4d\u0c24\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Detecting...": "\u0c17\u0c41\u0c30\u0c4d\u0c24\u0c3f\u0c38\u0c4d\u0c24\u0c4b\u0c02\u0c26\u0c3f...",
+    "Select City": "\u0c28\u0c17\u0c30\u0c02 \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f",
+    "Apply": "\u0c05\u0c2a\u0c4d\u0c32\u0c48 \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Applied": "\u0c05\u0c2a\u0c4d\u0c32\u0c48 \u0c05\u0c2f\u0c3f\u0c02\u0c26\u0c3f",
+    "Accept": "\u0c05\u0c02\u0c17\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Reject": "\u0c24\u0c3f\u0c30\u0c38\u0c4d\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Accepted": "\u0c05\u0c02\u0c17\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c3e\u0c30\u0c41",
+    "Rejected": "\u0c24\u0c3f\u0c30\u0c38\u0c4d\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c3e\u0c30\u0c41",
+    "Cancel": "\u0c30\u0c26\u0c4d\u0c26\u0c41",
+    "Undo": "\u0c35\u0c46\u0c28\u0c15\u0c4d\u0c15\u0c3f",
+    "View details": "\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c1a\u0c42\u0c21\u0c02\u0c21\u0c3f",
+    "Close": "\u0c2e\u0c42\u0c38\u0c3f\u0c35\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Status": "\u0c38\u0c4d\u0c25\u0c3f\u0c24\u0c3f",
+    "Budget": "\u0c2c\u0c21\u0c4d\u0c1c\u0c46\u0c1f\u0c4d",
+    "Details": "\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41",
+    "Tasks": "\u0c2a\u0c28\u0c41\u0c32\u0c41",
+    "Posted on": "\u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c38\u0c3f\u0c28 \u0c24\u0c47\u0c26\u0c40",
+    "No description provided.": "\u0c35\u0c3f\u0c35\u0c30\u0c23 \u0c07\u0c35\u0c4d\u0c35\u0c32\u0c47\u0c26\u0c41.",
+    "Not provided": "\u0c07\u0c35\u0c4d\u0c35\u0c32\u0c47\u0c26\u0c41",
+    "Not specified": "\u0c2a\u0c47\u0c30\u0c4d\u0c15\u0c4a\u0c28\u0c32\u0c47\u0c26\u0c41",
+    "Not available": "\u0c05\u0c02\u0c26\u0c41\u0c2c\u0c3e\u0c1f\u0c41\u0c32\u0c4b \u0c32\u0c47\u0c26\u0c41",
+    "Location not set": "\u0c38\u0c4d\u0c25\u0c3e\u0c28\u0c02 \u0c38\u0c46\u0c1f\u0c4d \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41",
+    "Budget not set": "\u0c2c\u0c21\u0c4d\u0c1c\u0c46\u0c1f\u0c4d \u0c38\u0c46\u0c1f\u0c4d \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41",
+    "Loading...": "\u0c32\u0c4b\u0c21\u0c4d \u0c05\u0c35\u0c41\u0c24\u0c4b\u0c02\u0c26\u0c3f...",
+    "Loading jobs...": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c32\u0c4b\u0c21\u0c4d \u0c05\u0c35\u0c41\u0c24\u0c41\u0c28\u0c4d\u0c28\u0c3e\u0c2f\u0c3f...",
+    "Failed to load jobs": "\u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c32\u0c4b\u0c21\u0c4d \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41",
+    "Failed to load your jobs.": "\u0c2e\u0c40 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c32\u0c4b\u0c21\u0c4d \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41.",
+    "You havent posted any jobs yet.": "\u0c2e\u0c40\u0c30\u0c41 \u0c07\u0c02\u0c15\u0c3e \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41 \u0c2a\u0c4b\u0c38\u0c4d\u0c1f\u0c4d \u0c1a\u0c47\u0c2f\u0c32\u0c47\u0c26\u0c41.",
+    "Profile": "\u0c2a\u0c4d\u0c30\u0c4a\u0c2b\u0c48\u0c32\u0c4d",
+    "Edit Profile": "\u0c2a\u0c4d\u0c30\u0c4a\u0c2b\u0c48\u0c32\u0c4d \u0c0e\u0c21\u0c3f\u0c1f\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Hired Jobs": "\u0c39\u0c48\u0c30\u0c4d \u0c1a\u0c47\u0c38\u0c3f\u0c28 \u0c09\u0c26\u0c4d\u0c2f\u0c4b\u0c17\u0c3e\u0c32\u0c41",
+    "Message": "\u0c2e\u0c46\u0c38\u0c47\u0c1c\u0c4d",
+    "Menu": "\u0c2e\u0c46\u0c28\u0c42",
+    "Follow": "\u0c2b\u0c3e\u0c32\u0c4b",
+    "Following": "\u0c2b\u0c3e\u0c32\u0c4b \u0c05\u0c35\u0c41\u0c24\u0c41\u0c28\u0c4d\u0c28\u0c3e\u0c30\u0c41",
+    "Followers": "\u0c2b\u0c3e\u0c32\u0c4b\u0c35\u0c30\u0c4d\u0c32\u0c41",
+    "open": "\u0c13\u0c2a\u0c46\u0c28\u0c4d",
+    "closed": "\u0c15\u0c4d\u0c32\u0c4b\u0c1c\u0c4d",
+    "draft": "\u0c21\u0c4d\u0c30\u0c3e\u0c2b\u0c4d\u0c1f\u0c4d"
+  };
+
   const translations = {
-    hi: {
-      "Settings": "सेटिंग्स",
-      "Back": "वापस",
-      "Language": "भाषा",
-      "App Language": "ऐप भाषा",
-      "Choose the language used across VIPs.": "VIPs में इस्तेमाल होने वाली भाषा चुनें।",
-      "Select Language": "भाषा चुनें",
-      "Language updated": "भाषा अपडेट हुई",
-      "Settings updated": "सेटिंग्स अपडेट हुईं",
-      "Settings updated successfully": "सेटिंग्स सफलतापूर्वक अपडेट हुईं",
-      "Error saving settings": "सेटिंग्स सेव करने में समस्या",
-      "Server connection failed": "सर्वर कनेक्शन विफल",
-      "Notifications": "सूचनाएं",
-      "Notifications (Soon)": "सूचनाएं (जल्द)",
-      "Push Notifications": "पुश सूचनाएं",
-      "Notification preferences updated": "सूचना पसंद अपडेट हुई",
-      "Logout": "लॉगआउट",
-      "Are you sure you want to logout?": "क्या आप सच में लॉगआउट करना चाहते हैं?",
-      "Privacy & Connections": "गोपनीयता और कनेक्शन",
-      "Follow to View Details": "विवरण देखने के लिए फॉलो",
-      "Workers must follow you to see Phone & Email": "फोन और ईमेल देखने के लिए वर्कर्स को आपको फॉलो करना होगा",
-      "Auto-Accept Follow Requests": "फॉलो अनुरोध अपने-आप स्वीकार करें",
-      "Instantly accept worker follow requests": "वर्कर फॉलो अनुरोध तुरंत स्वीकार करें",
-      "Preferences": "पसंद",
-      "Danger Zone": "सावधानी क्षेत्र",
-      "Delete Account": "खाता हटाएं",
-      "Jobs For You": "आपके लिए नौकरियां",
-      "Invited": "आमंत्रित",
-      "Posted": "पोस्ट की गई",
-      "Search invited jobs": "आमंत्रित नौकरियां खोजें",
-      "Search posted jobs": "पोस्ट की गई नौकरियां खोजें",
-      "Loading...": "लोड हो रहा है...",
-      "Loading jobs...": "नौकरियां लोड हो रही हैं...",
-      "Loading invites...": "आमंत्रण लोड हो रहे हैं...",
-      "Loading posted jobs...": "पोस्ट की गई नौकरियां लोड हो रही हैं...",
-      "No job invites": "कोई नौकरी आमंत्रण नहीं",
-      "No jobs available": "कोई नौकरी उपलब्ध नहीं",
-      "Failed to load invites": "आमंत्रण लोड नहीं हुए",
-      "Failed to load jobs": "नौकरियां लोड नहीं हुईं",
-      "Accept": "स्वीकार करें",
-      "Reject": "अस्वीकार करें",
-      "Accepted": "स्वीकार किया गया",
-      "Rejected": "अस्वीकार किया गया",
-      "Cancel": "रद्द करें",
-      "Undo": "पूर्ववत करें",
-      "Apply": "आवेदन करें",
-      "Applied": "आवेदन किया गया",
-      "View details": "विवरण देखें",
-      "Close": "बंद करें",
-      "Employer": "नियोक्ता",
-      "Location": "स्थान",
-      "Pay": "भुगतान",
-      "Budget": "बजट",
-      "Details": "विवरण",
-      "Tasks": "कार्य",
-      "Status": "स्थिति",
-      "Posted on": "पोस्ट किया गया",
-      "No description provided.": "कोई विवरण नहीं दिया गया।",
-      "Not provided": "नहीं दिया गया",
-      "Not specified": "निर्दिष्ट नहीं",
-      "Not available": "उपलब्ध नहीं",
-      "Select Your City": "अपना शहर चुनें",
-      "Search for your city...": "अपना शहर खोजें...",
-      "Search city...": "शहर खोजें...",
-      "Detect My Location": "मेरा स्थान पहचानें",
-      "Detecting...": "पहचाना जा रहा है...",
-      "Select City": "शहर चुनें",
-      "Find Services": "सेवाएं खोजें",
-      "Post a Job": "नौकरी पोस्ट करें",
-      "Add Post": "पोस्ट जोड़ें",
-      "Post a job": "नौकरी पोस्ट करें",
-      "My Posted Jobs": "मेरी पोस्ट की गई नौकरियां",
-      "Post Job": "नौकरी पोस्ट करें",
-      "Search for services or your posts...": "सेवाएं या अपनी पोस्ट खोजें...",
-      "General Labour / Helpers": "सामान्य मजदूर / सहायक",
-      "Delivery & Transport": "डिलीवरी और परिवहन",
-      "Skilled Workers": "कुशल वर्कर्स",
-      "Category Jobs": "श्रेणी नौकरियां",
-      "Profile": "प्रोफाइल",
-      "Worker Profile": "वर्कर प्रोफाइल",
-      "Employer Profile": "नियोक्ता प्रोफाइल",
-      "Edit Profile": "प्रोफाइल संपादित करें",
-      "Hired Jobs": "हायर की गई नौकरियां",
-      "Menu": "मेनू",
-      "Follow": "फॉलो करें",
-      "Following": "फॉलो कर रहे हैं",
-      "Followers": "फॉलोअर्स",
-      "Message": "संदेश",
-      "Requested": "अनुरोध भेजा गया",
-      "Follow to Contact": "संपर्क के लिए फॉलो करें",
-      "Message Worker": "वर्कर को संदेश भेजें",
-      "Phone": "फोन",
-      "Email": "ईमेल",
-      "Exp": "अनुभव",
-      "Hourly Rate": "प्रति घंटा दर",
-      "About Me": "मेरे बारे में",
-      "About": "बारे में",
-      "Portfolio": "पोर्टफोलियो",
-      "Portfolio Work": "पोर्टफोलियो काम",
-      "Add Project": "प्रोजेक्ट जोड़ें",
-      "Manage Expertise": "विशेषज्ञता संभालें",
-      "Expertise": "विशेषज्ञता",
-      "Manage": "संभालें",
-      "No bio available.": "बायो उपलब्ध नहीं।",
-      "No categories set.": "कोई श्रेणी सेट नहीं।",
-      "No work added yet.": "अभी कोई काम नहीं जोड़ा गया।",
-      "No projects showcased.": "कोई प्रोजेक्ट नहीं दिखाया गया।",
-      "Project": "प्रोजेक्ट",
-      "New Project": "नया प्रोजेक्ट",
-      "Delete": "हटाएं",
-      "Deleting...": "हटाया जा रहा है...",
-      "Delete Project?": "प्रोजेक्ट हटाएं?",
-      "Delete Project": "प्रोजेक्ट हटाएं",
-      "Add Media": "मीडिया जोड़ें",
-      "Replace Media": "मीडिया बदलें",
-      "Delete Media": "मीडिया हटाएं",
-      "Search people...": "लोग खोजें...",
-      "Workers": "वर्कर्स",
-      "Employers": "नियोक्ता",
-      "View Profile": "प्रोफाइल देखें",
-      "Unfollow": "अनफॉलो",
-      "Remove": "हटाएं",
-      "Follow Back": "वापस फॉलो करें",
-      "Nothing here yet.": "यहां अभी कुछ नहीं है।",
-      "Working...": "काम हो रहा है...",
-      "Load failed": "लोड विफल",
-      "VIP Verified Worker": "VIP सत्यापित वर्कर",
-      "Professional Specialist": "प्रोफेशनल विशेषज्ञ",
-      "Hidden": "छिपा हुआ",
-      "Location not set": "स्थान सेट नहीं",
-      "Budget not set": "बजट सेट नहीं",
-      "You haven’t posted any jobs yet.": "आपने अभी कोई नौकरी पोस्ट नहीं की है।",
-      "Failed to load your jobs.": "आपकी नौकरियां लोड नहीं हुईं।"
-    },
-    te: {
-      "Settings": "సెట్టింగ్స్",
-      "Back": "వెనక్కి",
-      "Language": "భాష",
-      "App Language": "యాప్ భాష",
-      "Choose the language used across VIPs.": "VIPs అంతటా ఉపయోగించే భాషను ఎంచుకోండి.",
-      "Select Language": "భాష ఎంచుకోండి",
-      "Language updated": "భాష అప్డేట్ అయింది",
-      "Settings updated": "సెట్టింగ్స్ అప్డేట్ అయ్యాయి",
-      "Settings updated successfully": "సెట్టింగ్స్ విజయవంతంగా అప్డేట్ అయ్యాయి",
-      "Error saving settings": "సెట్టింగ్స్ సేవ్ చేయడంలో సమస్య",
-      "Server connection failed": "సర్వర్ కనెక్షన్ విఫలమైంది",
-      "Notifications": "నోటిఫికేషన్స్",
-      "Notifications (Soon)": "నోటిఫికేషన్స్ (త్వరలో)",
-      "Push Notifications": "పుష్ నోటిఫికేషన్స్",
-      "Notification preferences updated": "నోటిఫికేషన్ ప్రిఫరెన్సులు అప్డేట్ అయ్యాయి",
-      "Logout": "లాగౌట్",
-      "Are you sure you want to logout?": "మీరు నిజంగా లాగౌట్ కావాలనుకుంటున్నారా?",
-      "Privacy & Connections": "గోప్యత & కనెక్షన్స్",
-      "Follow to View Details": "వివరాలు చూడటానికి ఫాలో",
-      "Workers must follow you to see Phone & Email": "ఫోన్ & ఈమెయిల్ చూడటానికి వర్కర్లు మిమ్మల్ని ఫాలో అవ్వాలి",
-      "Auto-Accept Follow Requests": "ఫాలో రిక్వెస్టులను ఆటోమేటిక్‌గా అంగీకరించండి",
-      "Instantly accept worker follow requests": "వర్కర్ ఫాలో రిక్వెస్టులను వెంటనే అంగీకరించండి",
-      "Preferences": "ప్రిఫరెన్సులు",
-      "Danger Zone": "జాగ్రత్త ప్రాంతం",
-      "Delete Account": "ఖాతాను తొలగించండి",
-      "Jobs For You": "మీ కోసం ఉద్యోగాలు",
-      "Invited": "ఆహ్వానాలు",
-      "Posted": "పోస్ట్ చేసినవి",
-      "Search invited jobs": "ఆహ్వాన ఉద్యోగాలు వెతకండి",
-      "Search posted jobs": "పోస్ట్ చేసిన ఉద్యోగాలు వెతకండి",
-      "Loading...": "లోడ్ అవుతోంది...",
-      "Loading jobs...": "ఉద్యోగాలు లోడ్ అవుతున్నాయి...",
-      "Loading invites...": "ఆహ్వానాలు లోడ్ అవుతున్నాయి...",
-      "Loading posted jobs...": "పోస్ట్ చేసిన ఉద్యోగాలు లోడ్ అవుతున్నాయి...",
-      "No job invites": "ఉద్యోగ ఆహ్వానాలు లేవు",
-      "No jobs available": "ఉద్యోగాలు అందుబాటులో లేవు",
-      "Failed to load invites": "ఆహ్వానాలు లోడ్ కాలేదు",
-      "Failed to load jobs": "ఉద్యోగాలు లోడ్ కాలేదు",
-      "Accept": "అంగీకరించండి",
-      "Reject": "తిరస్కరించండి",
-      "Accepted": "అంగీకరించారు",
-      "Rejected": "తిరస్కరించారు",
-      "Cancel": "రద్దు",
-      "Undo": "రద్దును వెనక్కి తీసుకోండి",
-      "Apply": "అప్లై చేయండి",
-      "Applied": "అప్లై అయ్యింది",
-      "View details": "వివరాలు చూడండి",
-      "Close": "మూసివేయండి",
-      "Employer": "నియామకుడు",
-      "Location": "స్థానం",
-      "Pay": "చెల్లింపు",
-      "Budget": "బడ్జెట్",
-      "Details": "వివరాలు",
-      "Tasks": "పనులు",
-      "Status": "స్థితి",
-      "Posted on": "పోస్ట్ చేసిన తేదీ",
-      "No description provided.": "వివరణ ఇవ్వలేదు.",
-      "Not provided": "ఇవ్వలేదు",
-      "Not specified": "పేర్కొనలేదు",
-      "Not available": "అందుబాటులో లేదు",
-      "Select Your City": "మీ నగరాన్ని ఎంచుకోండి",
-      "Search for your city...": "మీ నగరాన్ని వెతకండి...",
-      "Search city...": "నగరం వెతకండి...",
-      "Detect My Location": "నా స్థానం గుర్తించండి",
-      "Detecting...": "గుర్తిస్తోంది...",
-      "Select City": "నగరం ఎంచుకోండి",
-      "Find Services": "సేవలు కనుగొనండి",
-      "Post a Job": "ఉద్యోగం పోస్ట్ చేయండి",
-      "Add Post": "పోస్ట్ జోడించండి",
-      "Post a job": "ఉద్యోగం పోస్ట్ చేయండి",
-      "My Posted Jobs": "నేను పోస్ట్ చేసిన ఉద్యోగాలు",
-      "Post Job": "ఉద్యోగం పోస్ట్ చేయండి",
-      "Search for services or your posts...": "సేవలు లేదా మీ పోస్టులు వెతకండి...",
-      "General Labour / Helpers": "సాధారణ కార్మికులు / సహాయకులు",
-      "Delivery & Transport": "డెలివరీ & రవాణా",
-      "Skilled Workers": "నైపుణ్యం ఉన్న వర్కర్లు",
-      "Category Jobs": "వర్గం ఉద్యోగాలు",
-      "Profile": "ప్రొఫైల్",
-      "Worker Profile": "వర్కర్ ప్రొఫైల్",
-      "Employer Profile": "నియామకుడి ప్రొఫైల్",
-      "Edit Profile": "ప్రొఫైల్ ఎడిట్ చేయండి",
-      "Hired Jobs": "హైర్ చేసిన ఉద్యోగాలు",
-      "Menu": "మెనూ",
-      "Follow": "ఫాలో",
-      "Following": "ఫాలో అవుతున్నారు",
-      "Followers": "ఫాలోవర్లు",
-      "Message": "మెసేజ్",
-      "Requested": "రిక్వెస్ట్ పంపారు",
-      "Follow to Contact": "సంప్రదించడానికి ఫాలో చేయండి",
-      "Message Worker": "వర్కర్‌కు మెసేజ్ పంపండి",
-      "Phone": "ఫోన్",
-      "Email": "ఈమెయిల్",
-      "Exp": "అనుభవం",
-      "Hourly Rate": "గంటకు రేటు",
-      "About Me": "నా గురించి",
-      "About": "గురించి",
-      "Portfolio": "పోర్ట్‌ఫోలియో",
-      "Portfolio Work": "పోర్ట్‌ఫోలియో పని",
-      "Add Project": "ప్రాజెక్ట్ జోడించండి",
-      "Manage Expertise": "నైపుణ్యాలను నిర్వహించండి",
-      "Expertise": "నైపుణ్యం",
-      "Manage": "నిర్వహించండి",
-      "No bio available.": "బయో అందుబాటులో లేదు.",
-      "No categories set.": "వర్గాలు సెట్ చేయలేదు.",
-      "No work added yet.": "ఇంకా పని జోడించలేదు.",
-      "No projects showcased.": "ప్రాజెక్టులు చూపించలేదు.",
-      "Project": "ప్రాజెక్ట్",
-      "New Project": "కొత్త ప్రాజెక్ట్",
-      "Delete": "తొలగించండి",
-      "Deleting...": "తొలగిస్తోంది...",
-      "Delete Project?": "ప్రాజెక్ట్ తొలగించాలా?",
-      "Delete Project": "ప్రాజెక్ట్ తొలగించండి",
-      "Add Media": "మీడియా జోడించండి",
-      "Replace Media": "మీడియా మార్చండి",
-      "Delete Media": "మీడియా తొలగించండి",
-      "Search people...": "వ్యక్తులను వెతకండి...",
-      "Workers": "వర్కర్లు",
-      "Employers": "నియామకులు",
-      "View Profile": "ప్రొఫైల్ చూడండి",
-      "Unfollow": "అన్‌ఫాలో",
-      "Remove": "తొలగించండి",
-      "Follow Back": "తిరిగి ఫాలో చేయండి",
-      "Nothing here yet.": "ఇక్కడ ఇంకా ఏమీ లేదు.",
-      "Working...": "పని జరుగుతోంది...",
-      "Load failed": "లోడ్ విఫలమైంది",
-      "VIP Verified Worker": "VIP ధృవీకరించిన వర్కర్",
-      "Professional Specialist": "ప్రొఫెషనల్ నిపుణుడు",
-      "Hidden": "దాచబడింది",
-      "Location not set": "స్థానం సెట్ కాలేదు",
-      "Budget not set": "బడ్జెట్ సెట్ కాలేదు",
-      "You haven’t posted any jobs yet.": "మీరు ఇంకా ఉద్యోగాలు పోస్ట్ చేయలేదు.",
-      "Failed to load your jobs.": "మీ ఉద్యోగాలు లోడ్ కాలేదు."
-    }
+    hi,
+    te,
+    ta: { ...hi, "Language": "\u0bae\u0bca\u0bb4\u0bbf", "App Language": "\u0b86\u0baa\u0bcd \u0bae\u0bca\u0bb4\u0bbf", "Select Language": "\u0bae\u0bca\u0bb4\u0bbf\u0baf\u0bc8 \u0ba4\u0bc7\u0bb0\u0bcd\u0bb5\u0bc1 \u0b9a\u0bc6\u0baf\u0bcd\u0baf\u0bc1\u0b99\u0bcd\u0b95\u0bb3\u0bcd" },
+    kn: { ...hi, "Language": "\u0cad\u0cbe\u0cb7\u0cc6", "App Language": "\u0c86\u0caa\u0ccd \u0cad\u0cbe\u0cb7\u0cc6", "Select Language": "\u0cad\u0cbe\u0cb7\u0cc6 \u0c86\u0caf\u0ccd\u0c95\u0cc6\u0cae\u0cbe\u0ca1\u0cbf" },
+    ml: { ...hi, "Language": "\u0d2d\u0d3e\u0d37", "App Language": "\u0d06\u0d2a\u0d4d\u0d2a\u0d4d \u0d2d\u0d3e\u0d37", "Select Language": "\u0d2d\u0d3e\u0d37 \u0d24\u0d3f\u0d30\u0d1e\u0d4d\u0d1e\u0d46\u0d1f\u0d41\u0d15\u0d4d\u0d15\u0d41\u0d15" },
+    mr: { ...hi, "Language": "\u092d\u093e\u0937\u093e", "App Language": "\u0905\u0945\u092a \u092d\u093e\u0937\u093e", "Select Language": "\u092d\u093e\u0937\u093e \u0928\u093f\u0935\u0921\u093e" },
+    bn: { ...hi, "Language": "\u09ad\u09be\u09b7\u09be", "App Language": "\u0985\u09cd\u09af\u09be\u09aa \u09ad\u09be\u09b7\u09be", "Select Language": "\u09ad\u09be\u09b7\u09be \u09a8\u09bf\u09b0\u09cd\u09ac\u09be\u099a\u09a8 \u0995\u09b0\u09c1\u09a8" },
+    gu: { ...hi, "Language": "\u0aad\u0abe\u0ab7\u0abe", "App Language": "\u0a8f\u0aaa \u0aad\u0abe\u0ab7\u0abe", "Select Language": "\u0aad\u0abe\u0ab7\u0abe \u0aaa\u0ab8\u0a82\u0aa6 \u0a95\u0ab0\u0acb" },
+    ur: { ...hi, "Language": "\u0632\u0628\u0627\u0646", "App Language": "\u0627\u06cc\u067e \u0632\u0628\u0627\u0646", "Select Language": "\u0632\u0628\u0627\u0646 \u0645\u0646\u062a\u062e\u0628 \u06a9\u0631\u06cc\u06ba" }
   };
-
-  const fallbackCopies = {
-    ta: {
-      "Language": "மொழி",
-      "App Language": "ஆப் மொழி",
-      "Select Language": "மொழியை தேர்ந்தெடுக்கவும்",
-      "Settings": "அமைப்புகள்",
-      "Back": "பின்",
-      "Logout": "வெளியேறு",
-      "Jobs For You": "உங்களுக்கான வேலைகள்",
-      "Find Services": "சேவைகளை தேடுங்கள்",
-      "Post a Job": "வேலை பதிவிடுங்கள்",
-      "Profile": "சுயவிவரம்",
-      "Location": "இடம்",
-      "Phone": "தொலைபேசி",
-      "Email": "மின்னஞ்சல்",
-      "Close": "மூடு",
-      "Cancel": "ரத்து",
-      "Apply": "விண்ணப்பிக்கவும்"
-    },
-    kn: {
-      "Language": "ಭಾಷೆ",
-      "App Language": "ಆಪ್ ಭಾಷೆ",
-      "Select Language": "ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ",
-      "Settings": "ಸೆಟ್ಟಿಂಗ್ಸ್",
-      "Back": "ಹಿಂದೆ",
-      "Logout": "ಲಾಗೌಟ್",
-      "Jobs For You": "ನಿಮಗಾಗಿ ಉದ್ಯೋಗಗಳು",
-      "Find Services": "ಸೇವೆಗಳು ಹುಡುಕಿ",
-      "Post a Job": "ಉದ್ಯೋಗ ಪೋಸ್ಟ್ ಮಾಡಿ",
-      "Profile": "ಪ್ರೊಫೈಲ್",
-      "Location": "ಸ್ಥಳ",
-      "Phone": "ಫೋನ್",
-      "Email": "ಇಮೇಲ್",
-      "Close": "ಮುಚ್ಚಿ",
-      "Cancel": "ರದ್ದು",
-      "Apply": "ಅರ್ಜಿ ಹಾಕಿ"
-    },
-    ml: {
-      "Language": "ഭാഷ",
-      "App Language": "ആപ്പ് ഭാഷ",
-      "Select Language": "ഭാഷ തിരഞ്ഞെടുക്കുക",
-      "Settings": "ക്രമീകരണങ്ങൾ",
-      "Back": "തിരികെ",
-      "Logout": "ലോഗൗട്ട്",
-      "Jobs For You": "നിങ്ങൾക്കുള്ള ജോലികൾ",
-      "Find Services": "സേവനങ്ങൾ കണ്ടെത്തുക",
-      "Post a Job": "ജോലി പോസ്റ്റ് ചെയ്യുക",
-      "Profile": "പ്രൊഫൈൽ",
-      "Location": "സ്ഥലം",
-      "Phone": "ഫോൺ",
-      "Email": "ഇമെയിൽ",
-      "Close": "അടയ്‌ക്കുക",
-      "Cancel": "റദ്ദാക്കുക",
-      "Apply": "അപേക്ഷിക്കുക"
-    },
-    mr: {
-      "Language": "भाषा",
-      "App Language": "अॅप भाषा",
-      "Select Language": "भाषा निवडा",
-      "Settings": "सेटिंग्स",
-      "Back": "मागे",
-      "Logout": "लॉगआउट",
-      "Jobs For You": "तुमच्यासाठी नोकऱ्या",
-      "Find Services": "सेवा शोधा",
-      "Post a Job": "नोकरी पोस्ट करा",
-      "Profile": "प्रोफाइल",
-      "Location": "ठिकाण",
-      "Phone": "फोन",
-      "Email": "ईमेल",
-      "Close": "बंद",
-      "Cancel": "रद्द",
-      "Apply": "अर्ज करा"
-    },
-    bn: {
-      "Language": "ভাষা",
-      "App Language": "অ্যাপ ভাষা",
-      "Select Language": "ভাষা নির্বাচন করুন",
-      "Settings": "সেটিংস",
-      "Back": "ফিরে যান",
-      "Logout": "লগআউট",
-      "Jobs For You": "আপনার জন্য কাজ",
-      "Find Services": "সেবা খুঁজুন",
-      "Post a Job": "কাজ পোস্ট করুন",
-      "Profile": "প্রোফাইল",
-      "Location": "অবস্থান",
-      "Phone": "ফোন",
-      "Email": "ইমেল",
-      "Close": "বন্ধ",
-      "Cancel": "বাতিল",
-      "Apply": "আবেদন করুন"
-    },
-    gu: {
-      "Language": "ભાષા",
-      "App Language": "એપ ભાષા",
-      "Select Language": "ભાષા પસંદ કરો",
-      "Settings": "સેટિંગ્સ",
-      "Back": "પાછળ",
-      "Logout": "લોગઆઉટ",
-      "Jobs For You": "તમારા માટે નોકરીઓ",
-      "Find Services": "સેવાઓ શોધો",
-      "Post a Job": "નોકરી પોસ્ટ કરો",
-      "Profile": "પ્રોફાઇલ",
-      "Location": "સ્થાન",
-      "Phone": "ફોન",
-      "Email": "ઈમેલ",
-      "Close": "બંધ",
-      "Cancel": "રદ",
-      "Apply": "અરજી કરો"
-    },
-    ur: {
-      "Language": "زبان",
-      "App Language": "ایپ زبان",
-      "Select Language": "زبان منتخب کریں",
-      "Settings": "سیٹنگز",
-      "Back": "واپس",
-      "Logout": "لاگ آؤٹ",
-      "Jobs For You": "آپ کے لیے نوکریاں",
-      "Find Services": "سروسز تلاش کریں",
-      "Post a Job": "نوکری پوسٹ کریں",
-      "Profile": "پروفائل",
-      "Location": "مقام",
-      "Phone": "فون",
-      "Email": "ای میل",
-      "Close": "بند کریں",
-      "Cancel": "منسوخ",
-      "Apply": "درخواست دیں"
-    }
-  };
-
-  Object.keys(fallbackCopies).forEach((code) => {
-    translations[code] = { ...translations.hi, ...fallbackCopies[code] };
-  });
 
   function normalizeText(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
@@ -436,23 +259,55 @@
     if (languageCode === DEFAULT_LANGUAGE) return value;
     const dictionary = getDictionary(languageCode);
     const normalized = normalizeText(value);
-    if (!normalized) return value;
+    if (!normalized || neverTranslate.has(normalized)) return value;
     if (dictionary[normalized]) return dictionary[normalized];
 
     const dynamicRules = [
-      [/^(.+) Jobs$/, (_, name) => `${name} ${dictionary.Jobs || "Jobs"}`],
-      [/^Show (\d+) jobs in other locations$/, (_, count) => `${count} ${dictionary["jobs in other locations"] || "अन्य स्थानों की नौकरियां दिखाएं"}`],
-      [/^No jobs near "(.+)"\.$/, (_, place) => `${dictionary["No jobs near"] || "आस-पास कोई नौकरी नहीं"} "${place}".`],
-      [/^You are currently in (.+)$/, (_, place) => `${dictionary["You are currently in"] || "आप अभी यहां हैं"} ${place}`],
-      [/^previous location: (.+)$/i, (_, place) => `${dictionary["previous location"] || "पिछला स्थान"}: ${place}`],
-      [/^Delete (.+)\?$/, (_, item) => `${item} ${dictionary["Delete?"] || "हटाएं?"}`]
+      [/^(.+) Jobs$/, (_, name) => `${translateText(name, languageCode)} ${dictionary.Jobs || "Jobs"}`],
+      [/^Show (\d+) jobs in other locations$/, (_, count) => `${count} ${dictionary.Jobs || "jobs"}`],
+      [/^No jobs near "(.+)"\.$/, (_, place) => `${dictionary["No jobs available"] || "No jobs"} "${place}".`],
+      [/^You are currently in (.+)$/, (_, place) => `${dictionary.Location || "Location"}: ${place}`],
+      [/^previous location: (.+)$/i, (_, place) => `${dictionary.Location || "Location"}: ${place}`]
     ];
 
     for (const [pattern, replacer] of dynamicRules) {
       if (pattern.test(normalized)) return normalized.replace(pattern, replacer);
     }
 
-    return value;
+    return translateKnownWords(value, dictionary) || value;
+  }
+
+  function translateKnownWords(value, dictionary) {
+    const safeWords = Object.keys(dictionary)
+      .filter((key) => /^[A-Za-z][A-Za-z &/-]*$/.test(key) && key.length > 2 && !neverTranslate.has(key))
+      .sort((a, b) => b.length - a.length);
+    let output = value;
+    let changed = false;
+    safeWords.forEach((word) => {
+      output = output.replace(new RegExp(`\\b${escapeRegExp(word)}\\b`, "g"), () => {
+        changed = true;
+        return dictionary[word];
+      });
+    });
+    return changed ? output : "";
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function isUserDataElement(element) {
+    const id = element.id || "";
+    const className = typeof element.className === "string" ? element.className : "";
+    return /username|email|phone|location|name|photo|avatar|price|rate|pay|amount|date|time/i.test(id) ||
+      /username|email|phone|location|name|photo|avatar|price|rate|pay|amount|date|time/i.test(className);
+  }
+
+  function shouldSkipElement(element) {
+    if (!element) return true;
+    if (["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE", "PRE"].includes(element.tagName)) return true;
+    if (element.closest("[data-no-translate], .notranslate")) return true;
+    return isUserDataElement(element);
   }
 
   function translateNodeText(node, languageCode) {
@@ -466,16 +321,13 @@
     ["placeholder", "title", "aria-label", "value"].forEach((attr) => {
       if (!element.hasAttribute || !element.hasAttribute(attr)) return;
       if (attr === "value" && !["BUTTON", "INPUT"].includes(element.tagName)) return;
+      if (isUserDataElement(element)) return;
       const originalAttr = `data-vips-original-${attr}`;
       if (!element.hasAttribute(originalAttr)) {
         element.setAttribute(originalAttr, element.getAttribute(attr) || "");
       }
       element.setAttribute(attr, translateText(element.getAttribute(originalAttr), languageCode));
     });
-  }
-
-  function shouldSkipElement(element) {
-    return ["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE", "PRE"].includes(element.tagName);
   }
 
   function applyTranslations(root = document.body) {
@@ -488,10 +340,7 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode(node) {
         const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-        if (!element || shouldSkipElement(element.closest("script,style,noscript,textarea,code,pre") || element)) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return NodeFilter.FILTER_ACCEPT;
+        return shouldSkipElement(element) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
       }
     });
 
@@ -507,7 +356,6 @@
     });
   }
 
-  let observer;
   let applying = false;
   function scheduleApply() {
     if (applying) return;
@@ -583,11 +431,10 @@
       applyTranslations();
     });
 
-    observer = new MutationObserver(() => {
+    new MutationObserver(() => {
       initLanguageSelects();
       scheduleApply();
-    });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 
   window.VipsI18n = {

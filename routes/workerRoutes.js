@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -248,7 +248,7 @@ router.get('/messages/conversations', authMiddleware, async (req, res) => {
                     if (partner) {
                         conversationsMap.set(otherUserId, {
                             partner: { ...partner, _id: otherUserId },
-                            lastMessage: msg.text || (msg.image ? "📷 Photo" : ""),
+                            lastMessage: msg.text || (msg.image ? " Photo" : ""),
                             time: msg.createdAt,
                             isRead: msg.isRead
                         });

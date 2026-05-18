@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
 
@@ -13,7 +13,7 @@ profession: { type: String, default: 'Worker' },
 
 skills: { type: [String], default: [] },
 
-// ⭐ ADD THIS
+//  ADD THIS
 categories: [
 {
 name: String,

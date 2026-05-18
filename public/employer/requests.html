@@ -29,6 +29,7 @@
         .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;border:1px solid #1f6f3b;background:#0b2e1a;color:#7ef2b9;margin-top:6px;}
         .badge.rejected{background:#3a0f0f;color:#fca5a5;border-color:#7f1d1d;}
         .badge.cancelled{background:#374151;color:#cbd5e1;border-color:#475569;}
+        .badge.completed{background:#422006;color:#fde68a;border-color:#92400e;}
         .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
         .btn{padding:9px 14px;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
         .btn.primary{background:var(--accent);color:white;}
@@ -54,6 +55,20 @@
         <div id="invited-list"><p class="empty">Loading accepted invites...</p></div>
     </section>
 
+    <div id="review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:4000;align-items:center;justify-content:center;">
+        <div style="background:#0f1117;border:1px solid var(--border);border-radius:14px;padding:18px;width:90%;max-width:420px;">
+            <h2 style="margin:0 0 12px;font-size:18px;">Review Worker</h2>
+            <select id="review-rating" style="width:100%;padding:12px;border-radius:10px;background:#0b1220;color:white;border:1px solid var(--border);margin-bottom:10px;">
+                <option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option>
+            </select>
+            <textarea id="review-text" rows="4" maxlength="1000" placeholder="Write a short review..." style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;background:#0b1220;color:white;border:1px solid var(--border);"></textarea>
+            <div class="actions" style="justify-content:flex-end;">
+                <button class="btn ghost" onclick="closeReview()">Cancel</button>
+                <button class="btn primary" onclick="submitReview()">Save Review</button>
+            </div>
+        </div>
+    </div>
+
     <section id="requests-section">
         <div id="job-requests-list"><p class="empty">Loading job requests...</p></div>
     </section>
@@ -61,6 +76,7 @@
     <script>
         const API_BASE = window.location.origin;
         const token = localStorage.getItem('token');
+        let reviewTarget = null;
 
         function showTab(which){
             document.getElementById('tab-invited').classList.toggle('active', which==='invited');
@@ -92,8 +108,10 @@
                         <p class="meta"><i class="fas fa-briefcase"></i> ${inv.jobTitle}</p>
                         <p class="meta"><i class="fas fa-location-dot"></i> ${safeLocation(inv.workerId, inv.jobLocation, inv.workerLocationAtInvite)}</p>
                         <div class="actions">
-                            <button class="btn primary" onclick="openChat('${inv.workerId?._id || ''}', true)"><i class="fas fa-message"></i> Message</button>
-                            <button class="btn danger" onclick="rejectInvite('${inv._id}')"><i class="fas fa-xmark"></i> Reject</button>
+                            ${inv.status === 'completed'
+                                ? `<button class="btn primary" onclick="openReview('invite','${inv._id}')"><i class="fas fa-star"></i> Review</button>`
+                                : `<button class="btn primary" onclick="completeInvite('${inv._id}')"><i class="fas fa-check"></i> Complete</button>`}
+                            <button class="btn ghost" onclick="openChat('${inv.workerId?._id || ''}', true)"><i class="fas fa-message"></i> Message</button>
                         </div>
                     </div>
                 </div>
@@ -123,6 +141,7 @@
         function statusPill(status){
             const st = status || 'applied';
             if(st === 'accepted') return `<span class="badge">Accepted</span>`;
+            if(st === 'completed') return `<span class="badge completed">Completed</span>`;
             if(st === 'rejected') return `<span class="badge rejected">Rejected</span>`;
             if(st === 'withdrawn') return `<span class="badge cancelled">Cancelled by worker</span>`;
             return '';
@@ -133,7 +152,14 @@
             if(status === 'accepted'){
                 return `<div class="actions">
                     <button class="btn primary" style="opacity:0.8;cursor:default;">Accepted</button>
+                    <button class="btn primary" onclick="completeJobRequest('${req._id}')">Complete</button>
                     <button class="btn ghost" onclick="cancelJobRequest('${req._id}')">Cancel</button>
+                </div>`;
+            }
+            if(status === 'completed'){
+                return `<div class="actions">
+                    <button class="btn primary" onclick="openReview('application','${req._id}')">Review Worker</button>
+                    <button class="btn ghost" onclick="openChat('${req.workerId?._id || ''}', true)">Message</button>
                 </div>`;
             }
             if(status === 'rejected'){
@@ -216,6 +242,64 @@
                 });
                 loadData();
             }catch(err){ console.error(err); }
+        }
+
+        async function completeJobRequest(appId){
+            if(!appId) return;
+            try{
+                const res = await fetch(`${API_BASE}/api/employer/job-requests/${appId}/complete`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                if(!res.ok){
+                    const err = await res.json().catch(()=>({}));
+                    alert(err.message || 'Could not complete job');
+                }
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        async function completeInvite(inviteId){
+            if(!inviteId) return;
+            try{
+                const res = await fetch(`${API_BASE}/api/jobs/invites/${inviteId}/complete`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                if(!res.ok){
+                    const err = await res.json().catch(()=>({}));
+                    alert(err.message || 'Could not complete invite');
+                }
+                loadData();
+            }catch(err){ console.error(err); }
+        }
+
+        function openReview(sourceType, sourceId){
+            reviewTarget = { sourceType, sourceId };
+            document.getElementById('review-modal').style.display = 'flex';
+        }
+        function closeReview(){
+            reviewTarget = null;
+            document.getElementById('review-modal').style.display = 'none';
+            document.getElementById('review-text').value = '';
+            document.getElementById('review-rating').value = '5';
+        }
+        async function submitReview(){
+            if(!reviewTarget) return;
+            const res = await fetch(`${API_BASE}/api/reviews`,{
+                method:'POST',
+                headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    sourceType: reviewTarget.sourceType,
+                    sourceId: reviewTarget.sourceId,
+                    rating: Number(document.getElementById('review-rating').value),
+                    text: document.getElementById('review-text').value
+                })
+            });
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok){ alert(data.message || 'Review failed'); return; }
+            closeReview();
+            loadData();
         }
 
         async function loadData(){

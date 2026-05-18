@@ -1,4 +1,4 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') }); // Load .env variables before any process.env reads
+﻿require('dotenv').config({ path: require('path').join(__dirname, '.env') }); // Load .env variables before any process.env reads
 
 // Use Render's dynamic port or fallback to 5000 for local dev
 const PORT = process.env.PORT || 5000;
@@ -22,7 +22,7 @@ const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change_me_in_env') {
-    console.warn('⚠️  Set a strong JWT_SECRET in .env before production.');
+    console.warn('  Set a strong JWT_SECRET in .env before production.');
 }
 // Change this in your server.js route:
 // DELETE the old authMiddleware block and replace with this:
@@ -40,6 +40,7 @@ const Message = require('./models/Message');
 const Post = require('./models/Post'); 
 const Employer = require('./models/Employer'); 
 const PendingSignup = require('./models/PendingSignup');
+const Review = require('./models/Review');
 
 const app = express();
 const saltRounds = 10;
@@ -349,7 +350,7 @@ app.get(/\/search\.html$/i, (req, res) => {
     res.sendFile(path.join(__dirname, 'search.html'));
 });
 
-// --- ✅ MULTER CONFIGURATION (Fixes "upload is not defined") ---
+// ---  MULTER CONFIGURATION (Fixes "upload is not defined") ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => {
@@ -467,6 +468,55 @@ async function findUserByUsername(username) {
     const worker = await Worker.findOne({ username: exactCaseInsensitive });
     if (worker) return worker;
     return Employer.findOne({ username: exactCaseInsensitive });
+}
+
+function getExperienceLevel(completedJobs = 0) {
+    if (completedJobs >= 25) return 'Expert';
+    if (completedJobs >= 10) return 'Advanced';
+    if (completedJobs >= 3) return 'Experienced';
+    return completedJobs > 0 ? 'Rising' : 'New';
+}
+
+function getSubscriptionState(employer) {
+    const subscription = employer?.subscription || {};
+    const expiresAt = subscription.expiresAt ? new Date(subscription.expiresAt) : null;
+    const isActive = subscription.plan === 'premium' && subscription.status === 'active' && expiresAt && expiresAt > new Date();
+    return {
+        plan: isActive ? 'premium' : 'free',
+        status: isActive ? 'active' : 'inactive',
+        startedAt: subscription.startedAt || null,
+        expiresAt: isActive ? subscription.expiresAt : null,
+        premium: Boolean(isActive)
+    };
+}
+
+async function refreshRatingSummary(Model, userId) {
+    const summary = await Review.aggregate([
+        { $match: { revieweeId: new mongoose.Types.ObjectId(String(userId)) } },
+        { $group: { _id: '$revieweeId', average: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+    const first = summary[0] || { average: 0, count: 0 };
+    await Model.findByIdAndUpdate(userId, {
+        $set: {
+            ratingAverage: Math.round((first.average || 0) * 10) / 10,
+            ratingCount: first.count || 0
+        }
+    });
+}
+
+async function addWorkerHistory(workerId, historyItem) {
+    const worker = await Worker.findById(workerId);
+    if (!worker) return null;
+    const exists = (worker.jobHistory || []).some(item =>
+        item.sourceType === historyItem.sourceType &&
+        item.sourceId &&
+        item.sourceId.toString() === historyItem.sourceId.toString()
+    );
+    if (!exists) worker.jobHistory.push(historyItem);
+    worker.completedJobs = worker.jobHistory.length;
+    worker.experienceLevel = getExperienceLevel(worker.completedJobs);
+    await worker.save();
+    return worker;
 }
 
 async function cleanupExpiredSignupOtps() {
@@ -1036,9 +1086,48 @@ app.get('/api/auth/me', async (req, res) => {
         const user = await findUserById(decoded.id, decoded.role);
 
         if (!user) return res.status(404).json({ message: "User not found" });
-        res.json(user);
+        const data = user.toObject ? user.toObject() : user;
+        if (data.role === 'employer') data.subscription = getSubscriptionState(data);
+        res.json(data);
     } catch (err) { 
         res.status(401).json({ message: "Invalid token" }); 
+    }
+});
+
+app.get('/api/subscription/status', authMiddleware, async (req, res) => {
+    if (req.user.role !== 'employer') {
+        return res.status(403).json({ message: 'Only employers have subscriptions' });
+    }
+    res.json(getSubscriptionState(req.user));
+});
+
+app.post('/api/subscription/checkout', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can upgrade plans' });
+        }
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const paymentRef = `SIM-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const employer = await Employer.findByIdAndUpdate(
+            req.user._id,
+            {
+                $set: {
+                    subscription: {
+                        plan: 'premium',
+                        status: 'active',
+                        startedAt: now,
+                        expiresAt,
+                        simulatedPaymentRef: paymentRef
+                    }
+                }
+            },
+            { new: true }
+        );
+        res.json({ message: 'Premium plan activated', paymentRef, subscription: getSubscriptionState(employer) });
+    } catch (err) {
+        console.error('Subscription checkout failed:', err);
+        res.status(500).json({ message: 'Could not activate subscription' });
     }
 });
 
@@ -1650,19 +1739,181 @@ app.post('/api/profile/heartbeat', async (req, res) => {
 });
 const Job = require('./models/job');
 
-app.post('/api/jobs/create', async (req, res) => {
+app.get('/api/reviews/user/:userId', async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const reviews = await Review.find({ revieweeId: req.params.userId })
+            .sort({ createdAt: -1 })
+            .limit(50);
+        res.json(reviews);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to load reviews' });
+    }
+});
+
+app.post('/api/reviews', authMiddleware, async (req, res) => {
+    try {
+        const rating = Number(req.body.rating);
+        const text = String(req.body.text || '').trim();
+        const sourceType = req.body.sourceType === 'invite' ? 'invite' : 'application';
+        const sourceId = req.body.sourceId;
+
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+        }
+        if (!sourceId || !mongoose.Types.ObjectId.isValid(sourceId)) {
+            return res.status(400).json({ message: 'Invalid job reference' });
+        }
+
+        let source;
+        let employerId;
+        let workerId;
+        let jobId = null;
+        if (sourceType === 'application') {
+            source = await JobApplication.findById(sourceId);
+            if (!source || source.status !== 'completed') {
+                return res.status(400).json({ message: 'Reviews are available after job completion' });
+            }
+            employerId = source.employerId;
+            workerId = source.workerId;
+            jobId = source.jobId;
+        } else {
+            source = await JobInvite.findById(sourceId);
+            if (!source || source.status !== 'completed') {
+                return res.status(400).json({ message: 'Reviews are available after job completion' });
+            }
+            employerId = source.employerId;
+            workerId = source.workerId;
+        }
+
+        const reviewerId = req.user._id;
+        const isEmployerReview = req.user.role === 'employer' && employerId.toString() === reviewerId.toString();
+        const isWorkerReview = req.user.role === 'worker' && workerId.toString() === reviewerId.toString();
+        if (!isEmployerReview && !isWorkerReview) {
+            return res.status(403).json({ message: 'You can only review jobs connected to your account' });
+        }
+
+        const revieweeId = isEmployerReview ? workerId : employerId;
+        const review = await Review.findOneAndUpdate(
+            { reviewerId, revieweeId, sourceType, sourceId },
+            {
+                $setOnInsert: {
+                    employerId,
+                    workerId,
+                    jobId,
+                    inviteId: sourceType === 'invite' ? sourceId : null,
+                    applicationId: sourceType === 'application' ? sourceId : null,
+                    reviewerRole: req.user.role
+                },
+                $set: { rating, text }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        await refreshRatingSummary(isEmployerReview ? Worker : Employer, revieweeId);
+        res.json({ message: 'Review saved', review });
+    } catch (err) {
+        if (err?.code === 11000) {
+            return res.status(409).json({ message: 'You already reviewed this job' });
+        }
+        console.error('Review save failed:', err);
+        res.status(500).json({ message: 'Failed to save review' });
+    }
+});
+
+app.post('/api/employer/job-requests/:appId/complete', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can complete jobs' });
+        }
+        const appDoc = await JobApplication.findOneAndUpdate(
+            { _id: req.params.appId, employerId: req.user._id, status: 'accepted' },
+            { $set: { status: 'completed', completedAt: new Date(), workerSeen: false } },
+            { new: true }
+        ).populate('jobId', 'title');
+        if (!appDoc) return res.status(404).json({ message: 'Accepted job request not found' });
+        await addWorkerHistory(appDoc.workerId, {
+            title: appDoc.jobId?.title || 'Completed Job',
+            employerId: req.user._id,
+            sourceType: 'application',
+            sourceId: appDoc._id,
+            completedAt: appDoc.completedAt
+        });
+        res.json({ message: 'Job marked completed', application: appDoc });
+    } catch (err) {
+        console.error('Complete job request failed:', err);
+        res.status(500).json({ message: 'Failed to complete job' });
+    }
+});
+
+app.post('/api/jobs/invites/:inviteId/complete', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can complete invited jobs' });
+        }
+        const invite = await JobInvite.findOneAndUpdate(
+            { _id: req.params.inviteId, employerId: req.user._id, status: 'accepted' },
+            { $set: { status: 'completed', completedAt: new Date() } },
+            { new: true }
+        );
+        if (!invite) return res.status(404).json({ message: 'Accepted invite not found' });
+        await addWorkerHistory(invite.workerId, {
+            title: invite.jobTitle || 'Completed Invite',
+            employerId: req.user._id,
+            sourceType: 'invite',
+            sourceId: invite._id,
+            completedAt: invite.completedAt
+        });
+        res.json({ message: 'Invite marked completed', invite });
+    } catch (err) {
+        console.error('Complete invite failed:', err);
+        res.status(500).json({ message: 'Failed to complete invite' });
+    }
+});
+
+app.post('/api/jobs/create', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can post jobs' });
+        }
+        const title = String(req.body.title || '').trim();
+        const details = String(req.body.details || '').trim();
+        const totalFee = String(req.body.totalFee || '').trim();
+        const hours = String(req.body.hours || '').trim();
+        if (!title || !details || !totalFee || !hours) {
+            return res.status(400).json({ message: 'Title, details, total fee and hours are required' });
+        }
+        if (title.length > 120 || details.length > 3000) {
+            return res.status(400).json({ message: 'Job details are too long' });
+        }
+
+        const subscription = getSubscriptionState(req.user);
+        if (!subscription.premium) {
+            const monthStart = new Date();
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+            const monthlyJobs = await Job.countDocuments({ employerId: req.user._id, createdAt: { $gte: monthStart } });
+            if (monthlyJobs >= 3) {
+                return res.status(402).json({ message: 'Free plan allows 3 job posts per month. Upgrade to premium for unlimited posting.' });
+            }
+        }
 
         const newJob = new Job({
-            employerId: decoded.id,
-            ...req.body
+            employerId: req.user._id,
+            title,
+            details,
+            hourlyFee: String(req.body.hourlyFee || '').trim(),
+            totalFee,
+            hours,
+            workDetails: String(req.body.workDetails || '').trim(),
+            tasks: String(req.body.tasks || '').trim(),
+            category: String(req.body.category || '').trim(),
+            location: String(req.body.location || '').trim()
         });
 
         await newJob.save();
-        res.status(201).json({ message: "Job Created" });
+        res.status(201).json({ message: "Job Created", job: newJob });
     } catch (err) {
+        console.error('Create job failed:', err);
         res.status(500).json({ error: "Failed to create job" });
     }
 });
@@ -1730,9 +1981,9 @@ app.get('/api/employer/job-requests', authMiddleware, async (req, res) => {
 
         const apps = await JobApplication.find({
             employerId: req.user._id,
-            status: { $in: ['applied','accepted','rejected','withdrawn'] }
+            status: { $in: ['applied','accepted','rejected','withdrawn','completed'] }
         })
-        .populate('workerId', 'username profilePicture location phone email')
+        .populate('workerId', 'username profilePicture location phone email ratingAverage ratingCount completedJobs experienceLevel')
         .populate('jobId', 'title location totalFee hourlyFee');
 
         res.json(apps);
@@ -1827,8 +2078,8 @@ app.get('/api/employer/accepted-invites', authMiddleware, async (req, res) => {
 
         const invites = await JobInvite.find({
             employerId: req.user._id,
-            status: 'accepted'
-        }).populate('workerId', 'username profilePicture location phone email');
+            status: { $in: ['accepted', 'completed'] }
+        }).populate('workerId', 'username profilePicture location phone email ratingAverage ratingCount completedJobs experienceLevel');
 
         res.json(invites);
     } catch (err) {
@@ -1909,7 +2160,13 @@ const invitedIds = invites.map(i => i.workerId.toString());
 workers = workers.map(w => ({
 ...w,
 inviteSent: invitedIds.includes(w._id.toString())
-}));
+})).sort((a,b)=>{
+const ratingDiff=(b.ratingAverage||0)-(a.ratingAverage||0);
+if(ratingDiff!==0) return ratingDiff;
+const completedDiff=(b.completedJobs||0)-(a.completedJobs||0);
+if(completedDiff!==0) return completedDiff;
+return (a.username||"").localeCompare(b.username||"");
+});
 
 res.json(workers);
 
@@ -1965,7 +2222,7 @@ app.get('/api/users/profile/:id', async (req, res) => {
     profilePicture: foundUser.profilePicture || "",
     location: foundUser.location || "",
 
-    // ✅ ADD THESE
+    //  ADD THESE
     categories: foundUser.categories || [],
     
     skills: foundUser.skills || [],
@@ -1975,8 +2232,20 @@ app.get('/api/users/profile/:id', async (req, res) => {
     isFollowing: isFollowing,
     hasRequested: hasRequested,
     followToView: privacyEnabled,
-    companyName: foundUser.companyName || foundUser.username
+    companyName: foundUser.companyName || foundUser.username,
+    ratingAverage: foundUser.ratingAverage || 0,
+    ratingCount: foundUser.ratingCount || 0,
+    completedJobs: foundUser.completedJobs || 0,
+    experienceLevel: foundUser.experienceLevel || getExperienceLevel(foundUser.completedJobs || 0),
+    jobHistory: foundUser.jobHistory || [],
+    hourlyRate: foundUser.hourlyRate || 0,
+    experience: foundUser.experience || "",
+    projects: foundUser.projects || []
 };
+
+        if (foundUser.role === 'employer') {
+            profileData.subscription = getSubscriptionState(foundUser);
+        }
 
         // 5. Apply Privacy Masking
         // Allow view if: Not Private OR already Following OR looking at own profile OR target is a Worker
@@ -1984,8 +2253,8 @@ app.get('/api/users/profile/:id', async (req, res) => {
             profileData.email = foundUser.email;
             profileData.phone = foundUser.phone || "";
         } else {
-            profileData.email = "🔒 Follow to view";
-            profileData.phone = "🔒 Follow to view";
+            profileData.email = " Follow to view";
+            profileData.phone = " Follow to view";
             profileData.bio = "This profile is private. Follow to see details.";
         }
 
@@ -2045,6 +2314,25 @@ const employerId = req.user._id;
 const workerId = req.params.workerId;
 
 const {jobTitle,message, jobLocation} = req.body;
+const cleanJobTitle = String(jobTitle || "Job Opportunity").trim().slice(0, 120);
+const cleanMessage = String(message || "").trim().slice(0, 1000);
+if (!mongoose.Types.ObjectId.isValid(workerId)) {
+return res.status(400).json({message:"Invalid worker"});
+}
+if (req.user.role !== 'employer') {
+return res.status(403).json({message:"Only employers can invite workers"});
+}
+
+const subscription = getSubscriptionState(req.user);
+if (!subscription.premium) {
+const monthStart = new Date();
+monthStart.setDate(1);
+monthStart.setHours(0,0,0,0);
+const inviteCount = await JobInvite.countDocuments({ employerId, createdAt: { $gte: monthStart } });
+if (inviteCount >= 10) {
+return res.status(402).json({message:"Free plan allows 10 direct invites per month. Upgrade to premium for unlimited invites."});
+}
+}
 
 // Normalize location; fallback to employer profile if missing/blank
 const jobLocClean = (jobLocation || "").trim();
@@ -2052,12 +2340,15 @@ const finalJobLocation = jobLocClean || (req.user.location || "").trim() || "Not
 
 // fetch worker's current location snapshot
 const worker = await Worker.findById(workerId).select("location");
+if(!worker){
+return res.status(404).json({message:"Worker not found"});
+}
 
-// ✅ check if invite already exists
+//  check if invite already exists
 const existingInvite = await JobInvite.findOne({
 employerId,
 workerId,
-jobTitle,
+jobTitle: cleanJobTitle,
 status:"pending"
 });
 
@@ -2068,10 +2359,10 @@ return res.json({message:"Invite already sent"});
 const invite = new JobInvite({
 employerId,
 workerId,
-jobTitle,
+jobTitle: cleanJobTitle,
 jobLocation: finalJobLocation,
 workerLocationAtInvite: worker?.location || finalJobLocation,
-message
+message: cleanMessage
 });
 
 await invite.save();
@@ -2199,7 +2490,7 @@ app.get('/api/worker/job-updates', authMiddleware, async (req, res) => {
         }
         const updates = await JobApplication.find({
             workerId: req.user._id,
-            status: { $in: ['accepted','rejected','withdrawn'] }
+            status: { $in: ['accepted','rejected','withdrawn','completed'] }
         })
         .populate('jobId','title location details workDetails tasks totalFee hourlyFee status createdAt')
         .populate('employerId','username companyName location profilePicture');
@@ -2217,7 +2508,7 @@ app.post('/api/worker/job-updates/mark-read', authMiddleware, async (req, res) =
             return res.status(403).json({message:"Only workers can mark updates"});
         }
         await JobApplication.updateMany(
-            { workerId: req.user._id, status: { $in: ['accepted','rejected','withdrawn'] } },
+            { workerId: req.user._id, status: { $in: ['accepted','rejected','withdrawn','completed'] } },
             { $set: { workerSeen: true } }
         );
         res.json({message:"Marked as read"});
@@ -2259,16 +2550,16 @@ app.get('/', (req, res) => {
 // --- START SERVER ---
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-    console.error('❌ MONGODB_URI is missing in environment variables!');
+    console.error(' MONGODB_URI is missing in environment variables!');
     process.exit(1);
 }
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
-        console.log('✅ Database Connected Successfully');
-        app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+        console.log(' Database Connected Successfully');
+        app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
     })
     .catch(err => {
-        console.error('❌ MongoDB Connection Error:', err);
+        console.error(' MongoDB Connection Error:', err);
         process.exit(1); // Stop server if DB connection fails
     });

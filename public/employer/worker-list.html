@@ -50,9 +50,9 @@
 <span id="user-location-display" style="display: none;"></span>
 
 <div class="filter-bar">
-    <button class="filter-pill active">â˜† Top Rated</button>
-    <button class="filter-pill">ðŸ“ˆ Best Price</button>
-    <button class="filter-pill">ðŸŽ“ Most Experienced</button>
+    <button class="filter-pill active" onclick="applySort('rating', this)"> Top Rated</button>
+    <button class="filter-pill" onclick="applySort('price', this)"> Best Price</button>
+    <button class="filter-pill" onclick="applySort('experience', this)"> Most Experienced</button>
 </div>
 
 <div id="worker-results-container">
@@ -71,6 +71,7 @@
     let employerLocationText = "";       // Fallback string (Area, City (State))
     let cachedWorkers = [];              // Keep last fetched list to allow live re-sorting
     let locationWatchId = null;
+    let activeSort = 'rating';
 
     // 1. Initialize Page
     async function initPage() {
@@ -178,15 +179,16 @@ if(w.categories){
                 
                 <div class="worker-main-info" style="flex:1; margin-left:15px;">
                     <h4 style="margin:0; color:#0095f6; font-size:18px;">${w.username || 'Worker'} <i class="fas fa-check-circle" style="font-size:12px;"></i></h4>
-                    <p style="margin:4px 0; font-size:13px; color: white;">â­ 4.9 <span style="color:#888;">(200+ reviews)</span></p>
+                    <p style="margin:4px 0; font-size:13px; color: white;"> ${Number(w.ratingAverage || 0).toFixed(1)} <span style="color:#888;">(${w.ratingCount || 0} reviews)</span></p>
                     <div style="display:flex; gap:10px; font-size:12px; color:#8b949e; margin-top:8px;">
-                        <span><i class="fas fa-briefcase"></i> ${w.experience || '3+'} yrs</span>
+                        <span><i class="fas fa-briefcase"></i> ${w.experienceLevel || w.experience || 'New'}</span>
+                        <span><i class="fas fa-check"></i> ${w.completedJobs || 0} jobs</span>
                         <span><i class="fas fa-map-marker-alt"></i> ${w.location || 'Location Not Shared'}</span>
                     </div>
                 </div>
 
                 <div style="text-align:right;">
-                    <span style="display:block; color:#00f076; font-weight:bold; font-size:20px;">â‚¹${w.hourlyRate || 0}</span>
+                    <span style="display:block; color:#00f076; font-weight:bold; font-size:20px;">${w.hourlyRate || 0}</span>
                     <span style="font-size:11px; color:#8b949e;">per hour</span>
                 </div>
             </div>
@@ -219,6 +221,7 @@ style="background:#21262d;border:1px solid #30363d;color:#00f076;width:50px;bord
 }
 function renderWorkers(workers) {
         const container = document.getElementById('worker-results-container');
+        workers = sortWorkers(workers || []);
         const locEl = document.getElementById('user-location-display');
         const employerLocFull = (locEl ? locEl.innerText : employerLocationText || "").trim();
 
@@ -299,6 +302,29 @@ function renderWorkers(workers) {
         container.innerHTML = html || "<div class='no-results'>No workers found for this job.</div>";
     }
 
+    function applySort(sortName, btn){
+        activeSort = sortName;
+        document.querySelectorAll('.filter-pill').forEach(p=>p.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        renderWorkers(cachedWorkers);
+    }
+
+    function sortWorkers(workers){
+        const list = [...workers];
+        const toNumber = (v)=> Number(v || 0);
+        if(activeSort === 'price'){
+            return list.sort((a,b)=> toNumber(a.hourlyRate) - toNumber(b.hourlyRate));
+        }
+        if(activeSort === 'experience'){
+            return list.sort((a,b)=> toNumber(b.completedJobs) - toNumber(a.completedJobs));
+        }
+        return list.sort((a,b)=> {
+            const rating = toNumber(b.ratingAverage) - toNumber(a.ratingAverage);
+            if(rating !== 0) return rating;
+            return toNumber(b.ratingCount) - toNumber(a.ratingCount);
+        });
+    }
+
     // --- Geo helpers ---
     function extractWorkerCoords(w){
         // Prefer explicit coords property if backend starts sending it
@@ -353,7 +379,7 @@ const locationText = localStorage.getItem("userLocation") || "Not specified";
 try{
 
 btn.disabled = true;
-btn.innerHTML = "â³";
+btn.innerHTML = "";
 
 const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"POST",
@@ -395,7 +421,7 @@ const token = localStorage.getItem("token");
 try{
 
 btn.disabled = true;
-btn.innerHTML = "â³";
+btn.innerHTML = "";
 
 const res = await fetch(`${window.location.origin}/api/jobs/invite/${workerId}`,{
 method:"DELETE",

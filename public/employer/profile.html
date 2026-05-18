@@ -48,6 +48,17 @@
         /* --- TOP NAV --- */
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .menu-trigger { font-size: 28px; cursor: pointer; background: none; border: none; color: white; padding: 10px; }
+        .profile-actions { display: flex; gap: 10px; align-items: center; }
+        .edit-profile-btn,
+        .settings-icon-btn {
+            height: 34px; border: 1px solid #333; border-radius: 10px; color: white;
+            background: #1a1a1a; display: inline-flex; align-items: center; justify-content: center;
+            text-decoration: none; cursor: pointer; box-sizing: border-box;
+        }
+        .edit-profile-btn { flex: 1; font-size: 13px; font-weight: 600; }
+        .settings-icon-btn { width: 42px; font-size: 16px; }
+        .settings-icon-btn:hover,
+        .edit-profile-btn:hover { background: #222; }
 
         /* --- PROFILE HEADER --- */
         .main-card {
@@ -134,16 +145,18 @@
     
     <div class="sidebar" id="sidebar">
         <div style="font-size: 20px; font-weight: bold; margin-bottom: 30px;">Menu</div>
-        <a href="edit-profile.html" class="menu-item">ðŸ‘¤ Edit Profile</a>
-        <a href="hired-jobs.html" class="menu-item">ðŸ’¼ Hired Jobs</a>
-        <a href="settings.html" class="menu-item">âš™ï¸ Settings</a>
-        <a href="#" onclick="logout()" class="menu-item" style="color:var(--danger); margin-top: 50px;">ðŸšª Logout</a>
+        <a href="edit-profile.html" class="menu-item"> Edit Profile</a>
+        <a href="hired-jobs.html" class="menu-item"> Hired Jobs</a>
+        <a href="settings.html" class="menu-item"> Settings</a>
+        <a href="#" onclick="logout()" class="menu-item" style="color:var(--danger); margin-top: 50px;"> Logout</a>
     </div>
 
-    <div class="container">
+        <div class="container">
         <div class="top-nav" id="nav-header">
             <span style="font-weight: bold; color: var(--text-gray);">EMPLOYER PROFILE</span>
-            <button class="menu-trigger" onclick="toggleMenu()">â˜°</button>
+            <button class="menu-trigger" onclick="toggleMenu()" aria-label="Open profile menu" title="Menu">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
 
         <div class="main-card">
@@ -158,29 +171,35 @@
 
             <div class="stats-bar">
                 <div class="stat-item" onclick="openHiredJobs()"><span class="stat-value" id="followers-count">0</span><span class="stat-label">Hired Workers</span></div>
-                <div class="stat-item"><span class="stat-value">â­ 4.9</span><span class="stat-label">Rating</span></div>
+                <div class="stat-item"><span class="stat-value" id="rating-value">0.0</span><span class="stat-label">Rating</span></div>
                 <div class="stat-item" onclick="openHiredJobs()"><span class="stat-value" id="projects-count">0</span><span class="stat-label">Jobs</span></div>
             </div>
         </div>
 
         <div class="info-grid">
-            <div class="info-item"><div class="info-icon">ðŸ“</div><div class="info-content"><label>Location</label><span id="display-location">Loading...</span></div></div>
-            <div class="info-item"><div class="info-icon">ðŸ“ž</div><div class="info-content"><label>Phone</label><span id="display-phone">ðŸ”’ Hidden</span></div></div>
+            <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Location</label><span id="display-location">Loading...</span></div></div>
+            <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Phone</label><span id="display-phone"> Hidden</span></div></div>
         </div>
 
         <div class="section-card">
-            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">ðŸ›  Skills & Specialties</h3>
+            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);"> Skills & Specialties</h3>
             <div class="skills-container" id="skills-list"></div>
         </div>
 
         <div class="section-card">
-            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">ðŸ“ About</h3>
+            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);"> About</h3>
             <p id="display-bio" style="font-size: 13px; color: var(--text-gray); line-height: 1.5; margin:0;"></p>
+        </div>
+
+        <div class="section-card" id="subscription-card" style="display:none;">
+            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">Plan Status</h3>
+            <p id="subscription-text" style="font-size:13px;color:var(--text-gray);margin:0 0 12px;"></p>
+            <button id="upgrade-btn" class="ghost-btn" onclick="activatePremium()">Upgrade Monthly</button>
         </div>
 
         <div class="section-head">
             <div>
-                <h3 style="margin:0; font-size: 15px;">ðŸ–¼ Portfolio</h3>
+                <h3 style="margin:0; font-size: 15px;"> Portfolio</h3>
                 <p style="margin:4px 0 0 0;color:var(--text-gray);font-size:12px;">Showcase projects with up to 10 photos/videos each.</p>
             </div>
             <button class="ghost-btn" id="add-work-btn" style="display:none;">+ Add Project</button>
@@ -261,7 +280,7 @@
                 document.querySelector('.menu-trigger').style.display = 'none';
                 document.querySelector('.bottom-nav').style.display = 'none';
                 const backBtn = document.createElement('button');
-                backBtn.innerHTML = "â† Back";
+                backBtn.innerHTML = " Back";
                 backBtn.style.cssText = "background:#1a1a1a; color:white; border:1px solid #333; padding:5px 12px; border-radius:8px;";
                 backBtn.onclick = () => history.back();
                 document.getElementById('nav-header').prepend(backBtn);
@@ -282,6 +301,8 @@
                 document.getElementById('display-main-cat').innerText = user.mainCategory || "";
                 document.getElementById('followers-count').innerText = user.followers?.length || 0;
                 document.getElementById('projects-count').innerText = user.projects?.length || 0;
+                document.getElementById('rating-value').innerText = Number(user.ratingAverage || 0).toFixed(1);
+                renderSubscription(user);
 
                 // 2. Profile Image
                 if (user.profilePicture) {
@@ -309,7 +330,14 @@
                         btnBox.innerHTML = `<button onclick="handleFollow('${user._id}')" id="follow-btn" style="width:100%; padding:12px; background:transparent; border:1px solid var(--accent-blue); border-radius:10px; color:var(--accent-blue); font-weight:bold;">${isRequested ? 'Requested' : 'Follow to Contact'}</button>`;
                     }
                 } else {
-                    btnBox.innerHTML = `<button onclick="window.location.href='edit-profile.html'" style="width:100%; padding:10px; background:#1a1a1a; border:1px solid #333; border-radius:10px; color:white;">Edit Profile</button>`;
+                    btnBox.innerHTML = `
+                        <div class="profile-actions">
+                            <a href="edit-profile.html" class="edit-profile-btn">Edit Profile</a>
+                            <a href="settings.html" class="settings-icon-btn" aria-label="Settings" title="Settings">
+                                <i class="fas fa-gear"></i>
+                            </a>
+                        </div>
+                    `;
                 }
 
                 // 5. Skills Tags
@@ -352,6 +380,34 @@
                     btn.style.opacity = "0.5";
                 }
             } catch (e) { alert("Error sending request"); }
+        }
+
+        function renderSubscription(user){
+            const card = document.getElementById('subscription-card');
+            const text = document.getElementById('subscription-text');
+            const btn = document.getElementById('upgrade-btn');
+            if(!card || !text || !btn) return;
+            const myId = getMyData()?.id;
+            const isVisitor = viewedUserId && viewedUserId !== myId;
+            if(isVisitor){ card.style.display='none'; return; }
+            const sub = user.subscription || {};
+            const premium = sub.plan === 'premium' && sub.status === 'active';
+            card.style.display = 'block';
+            text.innerText = premium
+                ? `Premium active until ${sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : 'your renewal date'}. Unlimited posting and direct invites are enabled.`
+                : 'Free plan: 3 job posts and 10 direct invites per month. Upgrade is simulated until a payment provider is connected.';
+            btn.style.display = premium ? 'none' : 'inline-flex';
+        }
+
+        async function activatePremium(){
+            const res = await fetch(`${API_BASE}/api/subscription/checkout`,{
+                method:'POST',
+                headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}
+            });
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok){ alert(data.message || 'Upgrade failed'); return; }
+            alert(`Premium activated. Payment ref: ${data.paymentRef}`);
+            loadProfile();
         }
 
         function renderProjects(items){
@@ -427,18 +483,18 @@
             viewer.innerHTML = `
                 <div class="modal-head">
                   <div ondblclick="renameProject(event,'${current._id}','${current.title||'Project'}')"><strong>${current.title||'Project'}</strong> <span style="color:#888;font-size:12px;">${current.media?.length||0}/10</span></div>
-                  <button class="pill" onclick="closeViewer()">âœ–</button>
+                  <button class="pill" onclick="closeViewer()"></button>
                 </div>
                 <div class="modal-main">
-                  <button class="nav-btn left" onclick="changeMedia(-1)">â—€</button>
+                  <button class="nav-btn left" onclick="changeMedia(-1)"></button>
                   <div class="modal-media" id="media-slot"></div>
-                  <button class="nav-btn right" onclick="changeMedia(1)">â–¶</button>
+                  <button class="nav-btn right" onclick="changeMedia(1)"></button>
                 </div>
                 <div class="modal-foot">
                   <div id="dotbar"></div>
                   <div style="display:flex;gap:8px;align-items:center;">
                     ${isOwnerView && (current.media?.length||0)<10?'<button class="pill" onclick="appendMedia()">Add</button>':''}
-                    ${isOwnerView?'<button class="pill" onclick="showMenu()">â‹¯</button>':''}
+                    ${isOwnerView?'<button class="pill" onclick="showMenu()"></button>':''}
                   </div>
                 </div>`;
             renderMedia();

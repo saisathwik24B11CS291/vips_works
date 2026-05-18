@@ -18,6 +18,15 @@ const EmployerSchema = new mongoose.Schema({
     location: { type: String, default: 'Not set' },
     phone: String,
     profilePicture: { type: String, default: '' },
+    ratingAverage: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
+    subscription: {
+        plan: { type: String, enum: ['free', 'premium'], default: 'free' },
+        status: { type: String, enum: ['inactive', 'active', 'expired'], default: 'inactive' },
+        startedAt: { type: Date, default: null },
+        expiresAt: { type: Date, default: null },
+        simulatedPaymentRef: { type: String, default: '' }
+    },
     
     // --- Social & Privacy ---
    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],

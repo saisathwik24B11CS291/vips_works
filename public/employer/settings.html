@@ -89,13 +89,15 @@
             background: var(--accent-blue); color: white; padding: 10px 20px;
             border-radius: 20px; font-size: 14px; display: none; z-index: 100;
         }
+        .danger-row { color: var(--danger); }
+        .logout-row { color: white; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <div class="settings-header">
-            <a href="profile.html" class="back-btn">â† Back</a>
+            <a href="profile.html" class="back-btn"> Back</a>
             <h2 style="margin:0;">Settings</h2>
         </div>
 
@@ -103,7 +105,7 @@
         <div class="settings-group">
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">ðŸ”’</div>
+                    <div class="icon-box"></div>
                     <div>
                         <span class="row-label">Follow to View Details</span>
                         <span class="row-info">Workers must follow you to see Phone & Email</span>
@@ -116,7 +118,7 @@
             </div>
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">ðŸ¤</div>
+                    <div class="icon-box"></div>
                     <div>
                         <span class="row-label">Auto-Accept Follow Requests</span>
                         <span class="row-info">Instantly accept worker follow requests</span>
@@ -143,7 +145,7 @@
             </div>
             <div class="settings-row">
                 <div class="row-left">
-                    <div class="icon-box">ðŸ””</div>
+                    <div class="icon-box"></div>
                         <span class="row-label">Push Notifications</span>
                 </div>
                 <label class="switch">
@@ -153,11 +155,21 @@
             </div>
         </div>
 
+        <div class="group-title">Account</div>
+        <div class="settings-group">
+            <div class="settings-row logout-row" onclick="logout()">
+                <div class="row-left">
+                    <div class="icon-box">L</div>
+                    <span class="row-label">Logout</span>
+                </div>
+            </div>
+        </div>
+
         <div class="group-title">Danger Zone</div>
         <div class="settings-group">
-            <div class="settings-row" onclick="confirmDelete()">
+            <div class="settings-row danger-row" onclick="confirmDelete()">
                 <div class="row-left">
-                    <div class="icon-box" style="color:var(--danger)">âš ï¸</div>
+                    <div class="icon-box" style="color:var(--danger)"></div>
                     <span class="row-label" style="color:var(--danger)">Delete Account</span>
                 </div>
             </div>
@@ -254,6 +266,20 @@
                 // Call delete API here
                 showToast("Account deletion requested");
             }
+        }
+
+        function logout() {
+            const message = window.VipsI18n ? window.VipsI18n.translate("Are you sure you want to logout?") : "Are you sure you want to logout?";
+            if (!confirm(message)) return;
+            localStorage.clear();
+            window.history.replaceState(null, null, 'login.html');
+            for (let i = 0; i < 10; i++) {
+                window.history.pushState(null, null, 'login.html');
+            }
+            window.onpopstate = () => {
+                window.location.replace('login.html');
+            };
+            window.location.replace('login.html');
         }
 
         // Initialize on page load

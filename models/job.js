@@ -7,6 +7,7 @@ const JobSchema = new mongoose.Schema({
     hourlyFee: { type: String },
     totalFee: { type: String, required: true },
     hours: { type: String, required: true },
+    location: { type: String, default: '' },
     workDetails: { type: String },
     tasks: { type: String },
     category: { type: String }, 
@@ -14,4 +15,4 @@ const JobSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Job', JobSchema);
+module.exports = mongoose.models.Job || mongoose.model('Job', JobSchema);

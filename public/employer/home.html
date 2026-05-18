@@ -38,7 +38,12 @@
         }
 
         .header-actions { display: flex; gap: 15px; align-items: center; }
-        .icon-link { position: relative; color: white; text-decoration: none; font-size: 20px; }
+        .icon-link {
+            position: relative; color: white; text-decoration: none; font-size: 20px;
+            width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 10px; transition: background .2s ease;
+        }
+        .icon-link:hover { background: #1a1a1a; }
         
         .badge {
             position: absolute; top: -5px; right: -5px;
@@ -189,6 +194,9 @@
         .job-modal .close-btn{
             background:#da3633;color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;margin-top:12px;
         }
+        .plan-card{background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:14px;margin-bottom:18px;display:flex;justify-content:space-between;gap:12px;align-items:center;}
+        .plan-card p{margin:3px 0;color:var(--text-gray);font-size:12px;}
+        .plan-card button{background:var(--accent-blue);border:none;color:white;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;white-space:nowrap;}
         /* Premium Modal Overlay with Blur */
 .modal-overlay {
     position: fixed;
@@ -258,20 +266,18 @@
     </header>
 
     <div class="container">
+        <div class="plan-card" id="plan-card" style="display:none;">
+            <div>
+                <strong id="plan-title">Free plan</strong>
+                <p id="plan-copy">Loading plan status...</p>
+            </div>
+            <button id="plan-btn" onclick="activatePremium()">Upgrade</button>
+        </div>
         <div class="search-container-main">
             <i class="fas fa-search"></i>
             <input type="text" id="main-search" class="search-bar-main" placeholder="Search for services or your posts...">
             <div id="search-suggestions" class="search-suggestions"></div>
         </div>
-<div id="sub-modal" class="modal-sub">
-    <div class="modal-header">
-        <button class="back-btn" onclick="closeSubSection()">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <h2 id="modal-title">Category Jobs</h2>
-    </div>
-    <div id="sub-list"></div>
-</div>
         <h3>Find Services</h3>
         <div class="services-grid">
             <div class="service-card" onclick="openSubSection('General Labour')">
@@ -297,7 +303,7 @@
 
         <div class="my-jobs-section">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-                <h3 style="margin:0;font-size:15px;">ðŸ“„ My Posted Jobs</h3>
+                <h3 style="margin:0;font-size:15px;"> My Posted Jobs</h3>
                 <button onclick="window.location.href='post-job.html'" style="background:#1a1a1a;border:1px solid #333;color:white;padding:8px 12px;border-radius:10px;cursor:pointer;">+ Post Job</button>
             </div>
             <div class="jobs-list" id="my-jobs-list" style="margin-top:12px;">
@@ -480,7 +486,34 @@ function resetDetectBtn() {
                 const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const user = await res.json();
                 document.getElementById('user-location-display').innerText = user.location || "Select City";
+                renderPlan(user.subscription || {});
             } catch (e) { }
+        }
+
+        function renderPlan(sub){
+            const card=document.getElementById('plan-card');
+            const title=document.getElementById('plan-title');
+            const copy=document.getElementById('plan-copy');
+            const btn=document.getElementById('plan-btn');
+            if(!card) return;
+            const premium=sub.plan==='premium' && sub.status==='active';
+            card.style.display='flex';
+            title.innerText=premium?'Premium monthly':'Free plan';
+            copy.innerText=premium
+                ? `Unlimited posts and invites active until ${sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : 'renewal'}.`
+                : '3 job posts and 10 direct invites per month. Payments are simulated for now.';
+            btn.style.display=premium?'none':'block';
+        }
+
+        async function activatePremium(){
+            const res=await fetch(`${API_BASE}/api/subscription/checkout`,{
+                method:'POST',
+                headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}
+            });
+            const data=await res.json().catch(()=>({}));
+            if(!res.ok){ alert(data.message || 'Upgrade failed'); return; }
+            alert(`Premium activated. Payment ref: ${data.paymentRef}`);
+            loadHeader();
         }
 
         // --- SECTION LOGIC ---
@@ -535,18 +568,18 @@ function closeSubSection() {
             const list = document.getElementById('my-jobs-list');
             if(!list) return;
             if(!myJobs.length){
-                list.innerHTML = "<p style='color:#888;'>You havenâ€™t posted any jobs yet.</p>";
+                list.innerHTML = "<p style='color:#888;'>You havent posted any jobs yet.</p>";
                 return;
             }
             list.innerHTML = myJobs.map((job,idx)=>{
                 const loc = job.location || job.employerId?.location || "Location not set";
-                const pay = job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Budget not set");
+                const pay = job.totalFee ? `${job.totalFee}` : (job.hourlyFee ? `${job.hourlyFee}/hr` : "Budget not set");
                 const badge = job.status || "open";
                 return `
                     <div class="job-card">
                         <h4 onclick="showJobDetails(${idx})">${job.title}</h4>
-                        <div class="job-meta">ðŸ“ ${loc}</div>
-                        <div class="job-meta">ðŸ’° ${pay}</div>
+                        <div class="job-meta"> ${loc}</div>
+                        <div class="job-meta"> ${pay}</div>
                         <span class="badge ${badge}">${badge}</span>
                     </div>
                 `;
@@ -557,7 +590,7 @@ function closeSubSection() {
             const job = myJobs[idx];
             if(!job) return;
             const loc = job.location || job.employerId?.location || "Location not set";
-            const pay = job.totalFee ? `â‚¹${job.totalFee}` : (job.hourlyFee ? `â‚¹${job.hourlyFee}/hr` : "Budget not set");
+            const pay = job.totalFee ? `${job.totalFee}` : (job.hourlyFee ? `${job.hourlyFee}/hr` : "Budget not set");
             document.getElementById('job-detail-title').innerText = job.title || "Job";
             document.getElementById('job-detail-status').innerText = job.status || "open";
             document.getElementById('job-detail-location').innerText = loc;

@@ -18,8 +18,12 @@ const JobApplicationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["applied", "withdrawn", "accepted", "rejected"],
+        enum: ["applied", "withdrawn", "accepted", "rejected", "completed"],
         default: "applied"
+    },
+    completedAt: {
+        type: Date,
+        default: null
     },
     workerSeen: {
         type: Boolean,

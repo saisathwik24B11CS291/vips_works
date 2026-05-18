@@ -81,11 +81,11 @@ outline:none;
                 <textarea id="details" rows="4" placeholder="Describe your project in detail..." required></textarea>
             </div>
             <div class="form-group">
-                <div class="label-row"><i class="fas fa-dollar-sign"></i> Hourly Fee (â‚¹)</div>
+                <div class="label-row"><i class="fas fa-dollar-sign"></i> Hourly Fee ()</div>
                 <input type="number" id="hourly" placeholder="e.g., 500">
             </div>
             <div class="form-group">
-                <div class="label-row"><i class="fas fa-dollar-sign"></i> Total Fee (â‚¹)</div>
+                <div class="label-row"><i class="fas fa-dollar-sign"></i> Total Fee ()</div>
                 <input type="number" id="total" placeholder="e.g., 5000" required>
             </div>
             <div class="form-group">
@@ -133,9 +133,10 @@ location: document.getElementById('location').value
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(jobData)
                 });
-                if (response.ok) { alert("âœ… Job Posted!"); window.location.href = 'home.html'; }
-                else { alert("âŒ Failed to post job."); }
-            } catch (err) { alert("âŒ Server connection error."); }
+                const result = await response.json().catch(()=>({}));
+                if (response.ok) { alert("Job Posted!"); window.location.href = 'home.html'; }
+                else { alert(result.message || "Failed to post job."); }
+            } catch (err) { alert(" Server connection error."); }
             finally { btn.innerText = "Post Job"; btn.disabled = false; }
         };
     </script>

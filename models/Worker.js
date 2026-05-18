@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
 const workerSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
@@ -14,6 +14,17 @@ const workerSchema = new mongoose.Schema({
     bio: { type: String, default: '' },
     hourlyRate: { type: Number, default: 0 },
     experience: { type: String, default: '' },
+    ratingAverage: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
+    completedJobs: { type: Number, default: 0 },
+    experienceLevel: { type: String, default: 'New' },
+    jobHistory: [{
+        title: { type: String, default: 'Job' },
+        employerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employer' },
+        sourceType: { type: String, enum: ['application', 'invite'], default: 'application' },
+        sourceId: { type: mongoose.Schema.Types.ObjectId },
+        completedAt: { type: Date, default: Date.now }
+    }],
     categories: [{
         name: String, // e.g., "General Labour"
         tags: [String] // e.g., ["Cleaning", "Construction"]
@@ -28,7 +39,7 @@ const workerSchema = new mongoose.Schema({
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }],
     
-    // ✅ FOLLOW REQUEST LOGIC
+    //  FOLLOW REQUEST LOGIC
     followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }], 
     
     // History logs

@@ -32,6 +32,7 @@
         .pill.accepted{background:#0b2e1a;color:#7ef2b9;border-color:#1f6f3b;}
         .pill.rejected{background:#3a0f0f;color:#fca5a5;border-color:#7f1d1d;}
         .pill.cancelled{background:#374151;color:#cbd5e1;border-color:#475569;}
+        .pill.completed{background:#422006;color:#fde68a;border-color:#92400e;}
         .btn{padding:8px 12px;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
         .btn.ghost{background:#0b1220;color:var(--text);border:1px solid var(--border);}
         .btn.success{background:#22c55e;color:white;}
@@ -44,6 +45,20 @@
     <div class="header">
         <a href="messages.html" class="back-btn">&larr;</a>
         <h1>Updates</h1>
+    </div>
+
+    <div id="review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:4500;align-items:center;justify-content:center;">
+        <div style="background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:18px;width:90%;max-width:420px;">
+            <h2 style="margin:0 0 12px;font-size:18px;">Review Employer</h2>
+            <select id="review-rating" style="width:100%;padding:12px;border-radius:10px;background:#05070d;color:white;border:1px solid #1f2937;margin-bottom:10px;">
+                <option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option>
+            </select>
+            <textarea id="review-text" rows="4" maxlength="1000" placeholder="Write a short review..." style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;background:#05070d;color:white;border:1px solid #1f2937;"></textarea>
+            <div class="actions" style="justify-content:flex-end;">
+                <button class="btn ghost" onclick="closeReview()">Cancel</button>
+                <button class="btn success" onclick="submitReview()">Save Review</button>
+            </div>
+        </div>
     </div>
 
     <div class="tab-bar">
@@ -77,6 +92,7 @@
         const API_BASE = window.location.origin;
         const token = localStorage.getItem('token');
         let updatesCache = [];
+        let reviewTarget = null;
 
         function showTab(which){
             document.getElementById('tab-jobs').classList.toggle('active', which==='jobs');
@@ -95,9 +111,10 @@
             wrap.innerHTML = updates.map(up=>{
                 const accepted = up.status === 'accepted';
                 const cancelled = up.status === 'withdrawn';
-                const pillClass = accepted ? 'accepted' : (cancelled ? 'cancelled' : 'rejected');
-                const pillText = accepted ? 'Accepted' : (cancelled ? 'Cancelled' : 'Rejected');
-                const msg = accepted ? 'You have been accepted for this job.' : (cancelled ? 'You cancelled this application.' : 'Your application was rejected.');
+                const completed = up.status === 'completed';
+                const pillClass = completed ? 'completed' : (accepted ? 'accepted' : (cancelled ? 'cancelled' : 'rejected'));
+                const pillText = completed ? 'Completed' : (accepted ? 'Accepted' : (cancelled ? 'Cancelled' : 'Rejected'));
+                const msg = completed ? 'This job is complete. You can review the employer.' : (accepted ? 'You have been accepted for this job.' : (cancelled ? 'You cancelled this application.' : 'Your application was rejected.'));
                 const empImg = up.employerId?.profilePicture ? `${API_BASE}${up.employerId.profilePicture}` : 'https://via.placeholder.com/48';
                 return `
                     <div class="card">
@@ -108,7 +125,8 @@
                             <p class="meta"><i class="fas fa-location-dot"></i> ${up.jobId?.location || up.employerId?.location || 'Location not set'}</p>
                             <p class="meta">${msg}</p>
                             <div class="actions">
-                                ${cancelled ? `<button class="btn ghost" onclick="removeCard('${up._id}')">Delete</button>` :
+                                ${completed ? `<button class="btn success" onclick="openReview('application','${up._id}')">Review Employer</button>` :
+                                    cancelled ? `<button class="btn ghost" onclick="removeCard('${up._id}')">Delete</button>` :
                                     accepted ? `<button class="btn ghost" onclick="cancelApp('${up.jobId?._id||''}','${up._id}')">Cancel</button>` :
                                     `<button class="btn ghost" onclick="removeCard('${up._id}')">Delete</button>`}
                             </div>
@@ -177,7 +195,7 @@
             if(!up) return;
             document.getElementById('modal-title').innerText = up.jobId?.title || 'Job';
             document.getElementById('modal-loc').innerText = `Location: ${up.jobId?.location || up.employerId?.location || 'Not set'}`;
-            const pay = up.jobId?.totalFee ? `â‚¹${up.jobId.totalFee}` : (up.jobId?.hourlyFee ? `â‚¹${up.jobId.hourlyFee}/hr` : 'Budget not set');
+            const pay = up.jobId?.totalFee ? `${up.jobId.totalFee}` : (up.jobId?.hourlyFee ? `${up.jobId.hourlyFee}/hr` : 'Budget not set');
             document.getElementById('modal-pay').innerText = `Pay: ${pay}`;
             document.getElementById('modal-details').innerText = up.jobId?.details || up.jobId?.workDetails || 'No details provided.';
             document.getElementById('modal-tasks').innerText = up.jobId?.tasks ? `Tasks: ${up.jobId.tasks}` : '';
@@ -202,6 +220,33 @@
         function removeCard(id){
             updatesCache = (updatesCache||[]).filter(u=>u._id!==id);
             renderJobUpdates(updatesCache);
+        }
+
+        function openReview(sourceType, sourceId){
+            reviewTarget = { sourceType, sourceId };
+            document.getElementById('review-modal').style.display = 'flex';
+        }
+        function closeReview(){
+            reviewTarget = null;
+            document.getElementById('review-modal').style.display = 'none';
+            document.getElementById('review-text').value = '';
+            document.getElementById('review-rating').value = '5';
+        }
+        async function submitReview(){
+            if(!reviewTarget) return;
+            const res = await fetch(`${API_BASE}/api/reviews`,{
+                method:'POST',
+                headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    sourceType: reviewTarget.sourceType,
+                    sourceId: reviewTarget.sourceId,
+                    rating: Number(document.getElementById('review-rating').value),
+                    text: document.getElementById('review-text').value
+                })
+            });
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok){ alert(data.message || 'Review failed'); return; }
+            closeReview();
         }
 
         async function handleRequest(userId, actionType){

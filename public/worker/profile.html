@@ -31,7 +31,8 @@
     .stat-label{font-size:10px;color:var(--text-gray);text-transform:uppercase;}
     .action-group{position:absolute;top:16px;right:16px;gap:8px;display:flex;}
     .edit-btn{background:var(--accent-green);color:white;border:none;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;}
-    .settings-btn{background:rgba(255,255,255,0.08);border:1px solid var(--border);color:white;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+    .profile-link{display:flex;align-items:center;justify-content:space-between;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;color:white;padding:14px 16px;margin-bottom:18px;font-weight:700;}
+    .profile-link span{display:flex;align-items:center;gap:10px;}
     .visitor-actions{display:none;margin-top:12px;gap:10px;}
     .follow-btn{flex:1;background:transparent;border:1px solid var(--accent-green);color:var(--accent-green);padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;}
     .msg-btn{flex:1;background:var(--sky-blue);color:white;border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;}
@@ -110,21 +111,24 @@
     .chip-btn{padding:8px 12px;border-radius:10px;border:1px solid #2563eb;background:#1e3a8a;color:white;font-weight:700;cursor:pointer;}
     .chip-outline{padding:8px 12px;border-radius:10px;border:1px solid #374151;background:transparent;color:#d1d5db;font-weight:700;cursor:pointer;}
     .empty-state{padding:20px;text-align:center;color:#6b7280;}
+    .review-card{background:#0a0a0a;border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;color:#cbd5e1;font-size:13px;}
+    .history-item{border-left:2px solid #334155;padding:0 0 12px 12px;margin-left:4px;color:#cbd5e1;font-size:13px;}
   </style>
 </head>
 <body>
   <div class="container">
-    <a href="javascript:history.back()" id="back-to-search">â† Back</a>
+    <a href="javascript:history.back()" id="back-to-search"> Back</a>
     <div id="vip-status-badge" class="vip-badge">VIP Verified Worker</div>
 
     <div class="main-card">
       <div id="photo-box" class="profile-photo">U</div>
       <div class="profile-info">
-        <h2><span id="profile-name">Loading...</span> <span class="verified-badge">âœ“ Verified</span></h2>
+        <h2><span id="profile-name">Loading...</span> <span class="verified-badge"> Verified</span></h2>
         <p class="job-title" id="profile-profession">Professional Specialist</p>
         <div class="stats-bar">
       <div class="stat"><span class="stat-value" id="stat-followers">0</span><span class="stat-label">Followers</span></div>
       <div class="stat"><span class="stat-value" id="stat-following">0</span><span class="stat-label">Following</span></div>
+      <div class="stat"><span class="stat-value" id="stat-rating">0.0</span><span class="stat-label">Rating</span></div>
     </div>
         <div class="visitor-actions" id="visitor-actions">
           <button id="follow-btn" class="follow-btn" onclick="handleFollow()">Follow</button>
@@ -132,23 +136,31 @@
         </div>
       </div>
       <div class="action-group" id="owner-actions">
-        <a href="edit-profile.html" class="edit-btn">âœŽ Edit</a>
-        <a href="settings.html" class="settings-btn">âš™</a>
+        <a href="edit-profile.html" class="edit-btn"> Edit</a>
       </div>
     </div>
 
+    <a href="settings.html" class="profile-link" id="profile-settings-link">
+      <span><i class="fas fa-gear"></i> Settings</span>
+      <i class="fas fa-chevron-right"></i>
+    </a>
+
     <div class="info-grid">
-      <div class="info-item"><div class="info-icon">ðŸ“ž</div><div class="info-content"><label>Phone</label><span id="profile-phone">...</span></div></div>
-      <div class="info-item"><div class="info-icon">âœ‰ï¸</div><div class="info-content"><label>Email</label><span id="profile-email">...</span></div></div>
-      <div class="info-item"><div class="info-icon">ðŸ“</div><div class="info-content"><label>Location</label><span id="profile-location">...</span></div></div>
-      <div class="info-item"><div class="info-icon">ðŸ’¼</div><div class="info-content"><label>Exp</label><span id="profile-experience">...</span></div></div>
+      <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Phone</label><span id="profile-phone">...</span></div></div>
+      <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Email</label><span id="profile-email">...</span></div></div>
+      <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Location</label><span id="profile-location">...</span></div></div>
+      <div class="info-item"><div class="info-icon"></div><div class="info-content"><label>Exp</label><span id="profile-experience">...</span></div></div>
       <div class="info-item full">
-        <div class="info-icon" style="color:var(--accent-green)">ðŸ’°</div>
+        <div class="info-icon" style="color:var(--accent-green)"></div>
         <div class="info-content"><label>Hourly Rate</label><span id="profile-rate">Loading...</span></div>
       </div>
     </div>
 
     <div class="section-card" id="expertise-section" style="display:none;"></div>
+
+    <div class="section-card" id="experience-section" style="display:none;"></div>
+
+    <div class="section-card" id="reviews-section" style="display:none;"></div>
 
     <div class="section-card">
       <h3 id="bio-title">About Me</h3>
@@ -157,7 +169,7 @@
 
     <div class="section-head">
       <div>
-        <h3 style="margin:0;">ðŸ–¼ Portfolio Work</h3>
+        <h3 style="margin:0;"> Portfolio Work</h3>
         <p style="margin:4px 0 0 0;color:var(--text-gray);font-size:12px;">Showcase projects with up to 10 photos/videos each.</p>
       </div>
       <button class="ghost-btn" id="add-work-trigger" style="display:none;">+ Add Project</button>
@@ -206,7 +218,7 @@
           <button id="tab-followers" class="active" onclick="setNetworkMode('followers')">Followers</button>
           <button id="tab-following" onclick="setNetworkMode('following')">Following</button>
         </div>
-        <button class="pill" onclick="closeNetwork()">âœ–</button>
+        <button class="pill" onclick="closeNetwork()"></button>
       </div>
       <div class="network-search">
         <i class="fas fa-search"></i>
@@ -315,18 +327,18 @@ function drawViewer(){
   viewer.innerHTML = `
     <div class="modal-head">
       <div ondblclick="renameProject(event,'${current._id}','${current.title||'Project'}')"><strong>${current.title||'Project'}</strong> <span style="color:#888;font-size:12px;">${current.media?.length||0}/10</span></div>
-      <button class="topbar-btn" onclick="closeViewer()">âœ•</button>
+      <button class="topbar-btn" onclick="closeViewer()"></button>
     </div>
     <div class="modal-main">
-      <button class="nav-btn left" onclick="changeMedia(-1)">â—€</button>
+      <button class="nav-btn left" onclick="changeMedia(-1)"></button>
       <div class="modal-media" id="media-slot"></div>
-      <button class="nav-btn right" onclick="changeMedia(1)">â–¶</button>
+      <button class="nav-btn right" onclick="changeMedia(1)"></button>
     </div>
     <div class="modal-foot">
       <div id="dotbar"></div>
       <div style="display:flex;gap:8px;align-items:center;">
         ${isOwnerView && (current.media?.length||0)<10?'<button class="pill" onclick="appendMedia()">Add</button>':''}
-        ${isOwnerView?'<button class="pill" onclick="showMenu()">â‹¯</button>':''}
+        ${isOwnerView?'<button class="pill" onclick="showMenu()"></button>':''}
       </div>
     </div>`;
   renderMedia();
@@ -513,6 +525,7 @@ async function loadProfile(){
   const isLocked = !isOwner && !iFollowThem && viewerRole!=='employer';
 
   document.getElementById('owner-actions').style.display = isOwner ? 'flex':'none';
+  document.getElementById('profile-settings-link').style.display = isOwner ? 'flex':'none';
   document.getElementById('bottom-navigation').style.display = isOwner ? 'flex':'none';
   document.getElementById('visitor-actions').style.display = (!isOwner && viewerRole!=='employer') ? 'flex':'none';
   document.getElementById('back-to-search').style.display = isOwner ? 'none':'block';
@@ -522,12 +535,13 @@ async function loadProfile(){
   document.getElementById('profile-profession').innerText = data.mainCategory||"Worker";
   document.getElementById('stat-followers').innerText = followers.length;
   document.getElementById('stat-following').innerText = (data.following||[]).length;
+  document.getElementById('stat-rating').innerText = Number(data.ratingAverage || 0).toFixed(1);
   document.getElementById('profile-location').innerText = data.location||"Not Set";
-  document.getElementById('profile-experience').innerText = data.experience||"N/A";
+  document.getElementById('profile-experience').innerText = data.experienceLevel || data.experience || "New";
   document.getElementById('profile-rate').innerText = data.hourlyRate ? `$${data.hourlyRate}/hr` : "Negotiable";
   document.getElementById('profile-bio').innerText = data.bio||"No bio available.";
-  document.getElementById('profile-phone').innerText = isLocked ? "ðŸ”’ Follow to see" : (data.phone||"N/A");
-  document.getElementById('profile-email').innerText = isLocked ? "ðŸ”’ Follow to see" : (data.email||"N/A");
+  document.getElementById('profile-phone').innerText = isLocked ? " Follow to see" : (data.phone||"N/A");
+  document.getElementById('profile-email').innerText = isLocked ? " Follow to see" : (data.email||"N/A");
 
   if(data.profilePicture){
     document.getElementById('photo-box').innerHTML=`<img src="${API_BASE}${data.profilePicture}" onerror="this.src='https://via.placeholder.com/150';">`;
@@ -536,6 +550,8 @@ async function loadProfile(){
   }
 
   renderExpertise(data, isOwner);
+  renderExperience(data);
+  renderReviews(currentProfileId);
   currentProjects = data.projects||[];
   renderPortfolio(currentProjects);
   checkNotifications(token);
@@ -553,6 +569,33 @@ async function loadProfile(){
     followingStat.style.cursor="pointer";
     followersStat.onclick=()=>openNetwork('followers');
     followingStat.onclick=()=>openNetwork('following');
+  }
+}
+
+function renderExperience(data){
+  const box=document.getElementById('experience-section');
+  const history=data.jobHistory||[];
+  box.style.display='block';
+  box.innerHTML=`<h3><i class="fas fa-briefcase"></i> Work Experience</h3>
+    <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">${data.experienceLevel || 'New'} · ${data.completedJobs || history.length || 0} completed jobs</p>
+    ${history.length ? history.slice(-6).reverse().map(item=>`
+      <div class="history-item">
+        <strong>${item.title || 'Completed job'}</strong><br>
+        <span style="color:#94a3b8">${item.completedAt ? new Date(item.completedAt).toLocaleDateString() : ''}</span>
+      </div>`).join('') : '<p style="color:#777;font-size:13px;margin:0;">No completed jobs yet.</p>'}`;
+}
+
+async function renderReviews(userId){
+  const box=document.getElementById('reviews-section');
+  box.style.display='block';
+  try{
+    const res=await fetch(`${API_BASE}/api/reviews/user/${userId}`,{headers:{'Authorization':`Bearer ${token}`}});
+    const reviews=res.ok ? await res.json() : [];
+    box.innerHTML=`<h3><i class="fas fa-star"></i> Reviews</h3>` + (reviews.length ? reviews.slice(0,6).map(r=>`
+      <div class="review-card"><strong>★ ${r.rating}</strong> ${r.text || 'No written review'}</div>
+    `).join('') : '<p style="color:#777;font-size:13px;margin:0;">No reviews yet.</p>');
+  }catch(e){
+    box.innerHTML='<h3><i class="fas fa-star"></i> Reviews</h3><p style="color:#777;font-size:13px;margin:0;">Reviews unavailable.</p>';
   }
 }
 

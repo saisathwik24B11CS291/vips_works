@@ -269,14 +269,14 @@
             });
 
             if (res.ok) {
-                status.innerHTML = "âœ… Profile Transformed Successfully!";
+                status.innerHTML = " Profile Transformed Successfully!";
                 setTimeout(() => window.location.href = "profile.html", 800);
             } else {
-                status.innerHTML = "âŒ Transformation Failed.";
+                status.innerHTML = " Transformation Failed.";
                 btn.disabled = false;
             }
         } catch (err) {
-            status.innerHTML = "âŒ Network error.";
+            status.innerHTML = " Network error.";
             btn.disabled = false;
         }
     }
