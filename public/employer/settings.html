@@ -69,6 +69,21 @@
             outline: none;
             font-weight: 700;
         }
+        .language-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .settings-btn {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .save-btn { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .cancel-btn { background: #0b0b0b; color: white; }
 
         /* --- TOGGLE SWITCH --- */
         .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
@@ -141,7 +156,14 @@
                         <span class="row-info">Choose the language used across VIPs.</span>
                     </div>
                 </div>
-                <select id="language-select" class="language-select" data-language-select aria-label="Select Language"></select>
+                <select id="language-select" class="language-select" data-language-select data-language-deferred aria-label="Select Language"></select>
+            </div>
+            <div class="settings-row" id="language-actions" style="display:none;">
+                <div></div>
+                <div class="language-actions">
+                    <button type="button" class="settings-btn cancel-btn" id="language-cancel">Cancel</button>
+                    <button type="button" class="settings-btn save-btn" id="language-save">Save</button>
+                </div>
             </div>
             <div class="settings-row">
                 <div class="row-left">
@@ -187,6 +209,10 @@
         const autoAcceptToggle = document.getElementById('auto-accept-toggle');
         const notificationToggle = document.getElementById('notifications-toggle');
         const toast = document.getElementById('toast');
+        const languageSelect = document.getElementById('language-select');
+        const languageActions = document.getElementById('language-actions');
+        const languageSave = document.getElementById('language-save');
+        const languageCancel = document.getElementById('language-cancel');
 
         function showToast(msg) {
             toast.innerText = window.VipsI18n ? window.VipsI18n.translate(msg) : msg;
@@ -233,8 +259,19 @@
             showToast("Notification preferences updated");
         });
 
-        window.addEventListener('vips:languagechange', () => {
+        window.addEventListener('vips:languagepending', () => {
+            languageActions.style.display = 'flex';
+        });
+
+        languageSave.addEventListener('click', () => {
+            window.VipsI18n.setLanguage(languageSelect.value);
+            languageActions.style.display = 'none';
             showToast("Language updated");
+        });
+
+        languageCancel.addEventListener('click', () => {
+            languageSelect.value = window.VipsI18n.getLanguage();
+            languageActions.style.display = 'none';
         });
 
         // --- LOAD FUNCTION ---

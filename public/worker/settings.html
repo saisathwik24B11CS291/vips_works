@@ -70,6 +70,21 @@
             outline: none;
             font-weight: 700;
         }
+        .language-actions {
+            display: none;
+            gap: 10px;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .settings-btn {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .save-btn { background: var(--accent); color: #04110a; border-color: var(--accent); }
+        .cancel-btn { background: var(--card-soft); color: var(--text); }
         .menu-link {
             color: var(--text);
             text-decoration: none;
@@ -116,7 +131,14 @@
                         <span class="row-info">Choose the language used across VIPs.</span>
                     </div>
                 </div>
-                <select id="language-select" class="language-select" data-language-select aria-label="Select Language"></select>
+                <select id="language-select" class="language-select" data-language-select data-language-deferred aria-label="Select Language"></select>
+            </div>
+            <div class="settings-row" id="language-actions" style="display:none;">
+                <div></div>
+                <div class="language-actions" style="display:flex;">
+                    <button type="button" class="settings-btn cancel-btn" id="language-cancel">Cancel</button>
+                    <button type="button" class="settings-btn save-btn" id="language-save">Save</button>
+                </div>
             </div>
             <div class="settings-row menu-link" style="opacity:.65;">
                 <div class="row-left">
@@ -145,6 +167,10 @@
     <script src="../js/i18n.js"></script>
     <script>
         const toast = document.getElementById('toast');
+        const languageSelect = document.getElementById('language-select');
+        const languageActions = document.getElementById('language-actions');
+        const languageSave = document.getElementById('language-save');
+        const languageCancel = document.getElementById('language-cancel');
 
         function showToast(msg) {
             toast.innerText = window.VipsI18n ? window.VipsI18n.translate(msg) : msg;
@@ -152,7 +178,20 @@
             setTimeout(() => { toast.style.display = 'none'; }, 1800);
         }
 
-        window.addEventListener('vips:languagechange', () => showToast('Language updated'));
+        window.addEventListener('vips:languagepending', () => {
+            languageActions.style.display = 'flex';
+        });
+
+        languageSave.addEventListener('click', () => {
+            window.VipsI18n.setLanguage(languageSelect.value);
+            languageActions.style.display = 'none';
+            showToast('Language updated');
+        });
+
+        languageCancel.addEventListener('click', () => {
+            languageSelect.value = window.VipsI18n.getLanguage();
+            languageActions.style.display = 'none';
+        });
 
         function logout() {
             const message = window.VipsI18n ? window.VipsI18n.translate("Are you sure you want to logout?") : "Are you sure you want to logout?";

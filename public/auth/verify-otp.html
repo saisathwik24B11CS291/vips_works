@@ -71,7 +71,7 @@
                 const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, identifier, code })
+                    body: JSON.stringify({ email, identifier, code, role })
                 });
                 const data = await readApiResponse(res);
                 if (!res.ok) throw new Error(data.message || 'Invalid OTP');

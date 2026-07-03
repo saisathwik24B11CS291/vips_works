@@ -420,18 +420,26 @@ function maskEmail(email) {
     return `${visibleName}@${domain}`;
 }
 
-async function findUserByEmail(email) {
-    const normalized = normalizeEmail(email);
+function buildAccountIdentifierQuery(identifier) {
+    const normalized = String(identifier || '').trim().toLowerCase();
     if(!normalized) return null;
     const escaped = escapeRegex(normalized);
     const exactCaseInsensitive = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
 
-    const query = {
+    return {
         $or: [
             { email: exactCaseInsensitive },
             { username: exactCaseInsensitive }
         ]
     };
+}
+
+async function findUserByEmail(email, role) {
+    const query = buildAccountIdentifierQuery(email);
+    if(!query) return null;
+
+    if (role === 'worker') return Worker.findOne(query);
+    if (role === 'employer') return Employer.findOne(query);
 
     const worker = await Worker.findOne(query);
     if (worker) return worker;
@@ -846,15 +854,8 @@ app.post('/api/auth/login', async (req, res) => {
     const SECRET = JWT_SECRET;
 
     try {
-        // Prefer the requested role when available, then fallback to the other collection.
-        let user = null;
-        if (role === 'employer') {
-            user = await Employer.findOne({ username }) || await Worker.findOne({ username });
-        } else if (role === 'worker') {
-            user = await Worker.findOne({ username }) || await Employer.findOne({ username });
-        } else {
-            user = await Worker.findOne({ username }) || await Employer.findOne({ username });
-        }
+        const loginRole = role === 'employer' ? 'employer' : role === 'worker' ? 'worker' : null;
+        const user = await findUserByEmail(username, loginRole);
         
         if (!user) {
             return res.status(400).json({ message: 'User not found' });
@@ -887,10 +888,17 @@ app.post('/api/auth/google', async (req, res) => {
         const name = payload.name || payload.email.split('@')[0];
         const googleId = payload.sub;
 
+        const pickedRole = role === 'employer' ? 'employer' : 'worker';
+        const existingAccount = await findUserByEmailOnly(email);
+        if (existingAccount && existingAccount.role !== pickedRole) {
+            return res.status(403).json({
+                message: `This Google account is registered as ${existingAccount.role}. Please use the ${existingAccount.role} login page.`
+            });
+        }
+
         // find existing
-        let user = await findUserByEmail(email);
+        let user = existingAccount?.user || null;
         if(!user){
-            const pickedRole = role === 'employer' ? 'employer' : 'worker';
             if(pickedRole === 'employer'){
                 user = new Employer({ username: name, email, password: await bcrypt.hash(googleId, 10), role:'employer', loginProvider:'google' });
             }else{
@@ -968,10 +976,11 @@ function validateResetToken(resetToken, email) {
 
 app.post('/api/auth/forgot', async (req,res)=>{
     try{
-        const { email, identifier } = req.body;
+        const { email, identifier, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
+        const recoveryRole = role === 'employer' ? 'employer' : 'worker';
         if(!accountIdentifier) return res.status(400).json({message:"Email or username required"});
-        let user = await findUserByEmail(accountIdentifier);
+        let user = await findUserByEmail(accountIdentifier, recoveryRole);
         if(!user) return res.status(404).json({message:"User not found"});
         const accountEmail = normalizeEmail(user.email);
         if(!accountEmail) return res.status(400).json({message:"This account does not have an email address"});
@@ -1006,10 +1015,11 @@ app.post('/api/auth/forgot', async (req,res)=>{
 
 app.post('/api/auth/verify-otp', async (req,res)=>{
     try{
-        const { email, identifier, code } = req.body;
+        const { email, identifier, code, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
+        const recoveryRole = role === 'employer' ? 'employer' : 'worker';
         if(!accountIdentifier || !code) return res.status(400).json({message:"Email or username and OTP are required"});
-        const user = await findUserByEmail(accountIdentifier);
+        const user = await findUserByEmail(accountIdentifier, recoveryRole);
         if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
@@ -1041,15 +1051,33 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
 
 app.post('/api/auth/reset', async (req,res)=>{
     try{
-        const { email, identifier, code, newPassword, resetToken } = req.body;
+        const { email, identifier, code, newPassword, resetToken, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
+        const accountEmailFromRequest = normalizeEmail(email);
+        const recoveryRole = role === 'employer' ? 'employer' : 'worker';
         if(!accountIdentifier || !newPassword) return res.status(400).json({message:"Missing fields"});
-        let user = await findUserByEmail(accountIdentifier);
+        let user = null;
+        let decodedReset = null;
+
+        if(resetToken){
+            if(!accountEmailFromRequest) return res.status(400).json({message:"Missing fields"});
+            decodedReset = validateResetToken(resetToken, accountEmailFromRequest);
+            user = await findUserById(decodedReset.id, decodedReset.role);
+        }else{
+            user = await findUserByEmail(accountIdentifier, recoveryRole);
+        }
+
         if(!user) return res.status(400).json({message:"User not found"});
         const accountEmail = normalizeEmail(user.email);
 
         if(resetToken){
-            validateResetToken(resetToken, accountEmail);
+            if (
+                String(user._id) !== String(decodedReset.id) ||
+                user.role !== decodedReset.role ||
+                accountEmail !== decodedReset.email
+            ) {
+                return res.status(401).json({message:"Failed to reset password"});
+            }
         }else{
             if(!code || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
             if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
@@ -1091,43 +1119,6 @@ app.get('/api/auth/me', async (req, res) => {
         res.json(data);
     } catch (err) { 
         res.status(401).json({ message: "Invalid token" }); 
-    }
-});
-
-app.get('/api/subscription/status', authMiddleware, async (req, res) => {
-    if (req.user.role !== 'employer') {
-        return res.status(403).json({ message: 'Only employers have subscriptions' });
-    }
-    res.json(getSubscriptionState(req.user));
-});
-
-app.post('/api/subscription/checkout', authMiddleware, async (req, res) => {
-    try {
-        if (req.user.role !== 'employer') {
-            return res.status(403).json({ message: 'Only employers can upgrade plans' });
-        }
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const paymentRef = `SIM-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-        const employer = await Employer.findByIdAndUpdate(
-            req.user._id,
-            {
-                $set: {
-                    subscription: {
-                        plan: 'premium',
-                        status: 'active',
-                        startedAt: now,
-                        expiresAt,
-                        simulatedPaymentRef: paymentRef
-                    }
-                }
-            },
-            { new: true }
-        );
-        res.json({ message: 'Premium plan activated', paymentRef, subscription: getSubscriptionState(employer) });
-    } catch (err) {
-        console.error('Subscription checkout failed:', err);
-        res.status(500).json({ message: 'Could not activate subscription' });
     }
 });
 
@@ -1886,17 +1877,6 @@ app.post('/api/jobs/create', authMiddleware, async (req, res) => {
             return res.status(400).json({ message: 'Job details are too long' });
         }
 
-        const subscription = getSubscriptionState(req.user);
-        if (!subscription.premium) {
-            const monthStart = new Date();
-            monthStart.setDate(1);
-            monthStart.setHours(0, 0, 0, 0);
-            const monthlyJobs = await Job.countDocuments({ employerId: req.user._id, createdAt: { $gte: monthStart } });
-            if (monthlyJobs >= 3) {
-                return res.status(402).json({ message: 'Free plan allows 3 job posts per month. Upgrade to premium for unlimited posting.' });
-            }
-        }
-
         const newJob = new Job({
             employerId: req.user._id,
             title,
@@ -2321,17 +2301,6 @@ return res.status(400).json({message:"Invalid worker"});
 }
 if (req.user.role !== 'employer') {
 return res.status(403).json({message:"Only employers can invite workers"});
-}
-
-const subscription = getSubscriptionState(req.user);
-if (!subscription.premium) {
-const monthStart = new Date();
-monthStart.setDate(1);
-monthStart.setHours(0,0,0,0);
-const inviteCount = await JobInvite.countDocuments({ employerId, createdAt: { $gte: monthStart } });
-if (inviteCount >= 10) {
-return res.status(402).json({message:"Free plan allows 10 direct invites per month. Upgrade to premium for unlimited invites."});
-}
 }
 
 // Normalize location; fallback to employer profile if missing/blank

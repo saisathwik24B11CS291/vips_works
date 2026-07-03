@@ -19,6 +19,7 @@
             display: flex; align-items: center; justify-content: center;
             min-height: 100vh;
         }
+        .top-auth-link { position: fixed; top: 18px; right: 18px; color: white; background: #111; border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; text-decoration: none; font-weight: 800; font-size: 13px; }
 
         .auth-card {
             width: 100%; max-width: 400px; padding: 40px 20px;
@@ -61,6 +62,7 @@
     </style>
 </head>
 <body>
+<a href="home.html" class="top-auth-link" id="dashboard-link">Dashboard</a>
 
 <div class="auth-card">
     <div class="logo-circle">E</div>
@@ -100,6 +102,8 @@
 </div>
 
 <script>
+    document.getElementById('dashboard-link').href = localStorage.getItem('userRole') === 'worker' ? '../worker/profile.html' : 'home.html';
+
     async function handleSignup(event) {
     event.preventDefault();
 

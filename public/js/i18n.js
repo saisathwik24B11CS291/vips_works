@@ -1,7 +1,19 @@
 (function () {
   const STORAGE_KEY = "vips.language";
   const DEFAULT_LANGUAGE = "en";
-  const neverTranslate = new Set(["Email", "Username", "User Name", "Name", "Phone"]);
+  const neverTranslate = new Set(["VIPs"]);
+
+  const digitMaps = {
+    hi: "०१२३४५६७८९",
+    mr: "०१२३४५६७८९",
+    bn: "০১২৩৪৫৬৭৮৯",
+    gu: "૦૧૨૩૪૫૬૭૮૯",
+    te: "౦౧౨౩౪౫౬౭౮౯",
+    ta: "௦௧௨௩௪௫௬௭௮௯",
+    kn: "೦೧೨೩೪೫೬೭೮೯",
+    ml: "൦൧൨൩൪൫൬൭൮൯",
+    ur: "۰۱۲۳۴۵۶۷۸۹"
+  };
 
   const languages = [
     { code: "en", nativeName: "English", englishName: "English" },
@@ -18,6 +30,20 @@
 
   const hi = {
     "Settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938",
+    "Username": "\u092f\u0942\u091c\u0930\u0928\u0947\u092e",
+    "Choose Username": "\u092f\u0942\u091c\u0930\u0928\u0947\u092e \u091a\u0941\u0928\u0947\u0902",
+    "Your Username": "\u0905\u092a\u0928\u093e \u092f\u0942\u091c\u0930\u0928\u0947\u092e",
+    "Enter your username": "\u0905\u092a\u0928\u093e \u092f\u0942\u091c\u0930\u0928\u0947\u092e \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902",
+    "Choose a username": "\u090f\u0915 \u092f\u0942\u091c\u0930\u0928\u0947\u092e \u091a\u0941\u0928\u0947\u0902",
+    "Password": "\u092a\u093e\u0938\u0935\u0930\u094d\u0921",
+    "Create Password": "\u092a\u093e\u0938\u0935\u0930\u094d\u0921 \u092c\u0928\u093e\u090f\u0902",
+    "Create a password": "\u090f\u0915 \u092a\u093e\u0938\u0935\u0930\u094d\u0921 \u092c\u0928\u093e\u090f\u0902",
+    "Email Address": "\u0908\u092e\u0947\u0932 \u092a\u0924\u093e",
+    "Phone Number": "\u092b\u094b\u0928 \u0928\u0902\u092c\u0930",
+    "Login": "\u0932\u0949\u0917\u093f\u0928",
+    "Signup": "\u0938\u093e\u0907\u0928\u0905\u092a",
+    "Dashboard": "\u0921\u0948\u0936\u092c\u094b\u0930\u094d\u0921",
+    "Save": "\u0938\u0947\u0935",
     "Back": "\u0935\u093e\u092a\u0938",
     "Language": "\u092d\u093e\u0937\u093e",
     "App Language": "\u090f\u092a \u092d\u093e\u0937\u093e",
@@ -125,6 +151,20 @@
 
   const te = {
     "Settings": "\u0c38\u0c46\u0c1f\u0c4d\u0c1f\u0c3f\u0c02\u0c17\u0c4d\u0c38\u0c4d",
+    "Username": "\u0c2f\u0c42\u0c1c\u0c30\u0c4d\u0c28\u0c47\u0c2e\u0c4d",
+    "Choose Username": "\u0c2f\u0c42\u0c1c\u0c30\u0c4d\u0c28\u0c47\u0c2e\u0c4d \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f",
+    "Your Username": "\u0c2e\u0c40 \u0c2f\u0c42\u0c1c\u0c30\u0c4d\u0c28\u0c47\u0c2e\u0c4d",
+    "Enter your username": "\u0c2e\u0c40 \u0c2f\u0c42\u0c1c\u0c30\u0c4d\u0c28\u0c47\u0c2e\u0c4d \u0c0e\u0c02\u0c1f\u0c30\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f",
+    "Choose a username": "\u0c12\u0c15 \u0c2f\u0c42\u0c1c\u0c30\u0c4d\u0c28\u0c47\u0c2e\u0c4d \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f",
+    "Password": "\u0c2a\u0c3e\u0c38\u0c4d\u0c35\u0c30\u0c4d\u0c21\u0c4d",
+    "Create Password": "\u0c2a\u0c3e\u0c38\u0c4d\u0c35\u0c30\u0c4d\u0c21\u0c4d \u0c38\u0c43\u0c37\u0c4d\u0c1f\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Create a password": "\u0c12\u0c15 \u0c2a\u0c3e\u0c38\u0c4d\u0c35\u0c30\u0c4d\u0c21\u0c4d \u0c38\u0c43\u0c37\u0c4d\u0c1f\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f",
+    "Email Address": "\u0c08\u0c2e\u0c46\u0c2f\u0c3f\u0c32\u0c4d \u0c1a\u0c3f\u0c30\u0c41\u0c28\u0c3e\u0c2e\u0c3e",
+    "Phone Number": "\u0c2b\u0c4b\u0c28\u0c4d \u0c28\u0c02\u0c2c\u0c30\u0c4d",
+    "Login": "\u0c32\u0c3e\u0c17\u0c3f\u0c28\u0c4d",
+    "Signup": "\u0c38\u0c48\u0c28\u0c2a\u0c4d",
+    "Dashboard": "\u0c21\u0c3e\u0c37\u0c4d\u0c2c\u0c4b\u0c30\u0c4d\u0c21\u0c4d",
+    "Save": "\u0c38\u0c47\u0c35\u0c4d",
     "Back": "\u0c35\u0c46\u0c28\u0c15\u0c4d\u0c15\u0c3f",
     "Language": "\u0c2d\u0c3e\u0c37",
     "App Language": "\u0c2f\u0c3e\u0c2a\u0c4d \u0c2d\u0c3e\u0c37",
@@ -260,7 +300,7 @@
     const dictionary = getDictionary(languageCode);
     const normalized = normalizeText(value);
     if (!normalized || neverTranslate.has(normalized)) return value;
-    if (dictionary[normalized]) return dictionary[normalized];
+    if (dictionary[normalized]) return localizeDigits(dictionary[normalized], languageCode);
 
     const dynamicRules = [
       [/^(.+) Jobs$/, (_, name) => `${translateText(name, languageCode)} ${dictionary.Jobs || "Jobs"}`],
@@ -271,10 +311,16 @@
     ];
 
     for (const [pattern, replacer] of dynamicRules) {
-      if (pattern.test(normalized)) return normalized.replace(pattern, replacer);
+      if (pattern.test(normalized)) return localizeDigits(normalized.replace(pattern, replacer), languageCode);
     }
 
-    return translateKnownWords(value, dictionary) || value;
+    return localizeDigits(translateKnownWords(value, dictionary) || value, languageCode);
+  }
+
+  function localizeDigits(value, languageCode) {
+    const digits = digitMaps[languageCode];
+    if (!digits) return value;
+    return String(value).replace(/\d/g, (digit) => digits[Number(digit)]);
   }
 
   function translateKnownWords(value, dictionary) {
@@ -397,7 +443,13 @@
       if (!select.dataset.ready) {
         createLanguageOptions(select);
         select.dataset.ready = "true";
-        select.addEventListener("change", () => setLanguage(select.value));
+        select.addEventListener("change", () => {
+          if (select.hasAttribute("data-language-deferred")) {
+            window.dispatchEvent(new CustomEvent("vips:languagepending", { detail: { language: select.value } }));
+            return;
+          }
+          setLanguage(select.value);
+        });
       } else {
         select.value = currentLanguage();
       }

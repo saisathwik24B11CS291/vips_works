@@ -191,12 +191,6 @@
             <p id="display-bio" style="font-size: 13px; color: var(--text-gray); line-height: 1.5; margin:0;"></p>
         </div>
 
-        <div class="section-card" id="subscription-card" style="display:none;">
-            <h3 style="margin-top:0; font-size:15px; color:var(--accent-blue);">Plan Status</h3>
-            <p id="subscription-text" style="font-size:13px;color:var(--text-gray);margin:0 0 12px;"></p>
-            <button id="upgrade-btn" class="ghost-btn" onclick="activatePremium()">Upgrade Monthly</button>
-        </div>
-
         <div class="section-head">
             <div>
                 <h3 style="margin:0; font-size: 15px;"> Portfolio</h3>
@@ -302,7 +296,6 @@
                 document.getElementById('followers-count').innerText = user.followers?.length || 0;
                 document.getElementById('projects-count').innerText = user.projects?.length || 0;
                 document.getElementById('rating-value').innerText = Number(user.ratingAverage || 0).toFixed(1);
-                renderSubscription(user);
 
                 // 2. Profile Image
                 if (user.profilePicture) {
@@ -380,34 +373,6 @@
                     btn.style.opacity = "0.5";
                 }
             } catch (e) { alert("Error sending request"); }
-        }
-
-        function renderSubscription(user){
-            const card = document.getElementById('subscription-card');
-            const text = document.getElementById('subscription-text');
-            const btn = document.getElementById('upgrade-btn');
-            if(!card || !text || !btn) return;
-            const myId = getMyData()?.id;
-            const isVisitor = viewedUserId && viewedUserId !== myId;
-            if(isVisitor){ card.style.display='none'; return; }
-            const sub = user.subscription || {};
-            const premium = sub.plan === 'premium' && sub.status === 'active';
-            card.style.display = 'block';
-            text.innerText = premium
-                ? `Premium active until ${sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString() : 'your renewal date'}. Unlimited posting and direct invites are enabled.`
-                : 'Free plan: 3 job posts and 10 direct invites per month. Upgrade is simulated until a payment provider is connected.';
-            btn.style.display = premium ? 'none' : 'inline-flex';
-        }
-
-        async function activatePremium(){
-            const res = await fetch(`${API_BASE}/api/subscription/checkout`,{
-                method:'POST',
-                headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}
-            });
-            const data = await res.json().catch(()=>({}));
-            if(!res.ok){ alert(data.message || 'Upgrade failed'); return; }
-            alert(`Premium activated. Payment ref: ${data.paymentRef}`);
-            loadProfile();
         }
 
         function renderProjects(items){

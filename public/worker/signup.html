@@ -28,6 +28,19 @@
             min-height: 100vh;
             padding: 20px;
         }
+        .top-auth-link {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            color: var(--primary);
+            background: rgba(255,255,255,0.78);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 14px;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.85rem;
+        }
 
         .signup-card {
             width: 100%;
@@ -167,6 +180,7 @@
     </style>
 </head>
 <body>
+    <a href="../worker/profile.html" class="top-auth-link" id="dashboard-link">Dashboard</a>
 
     <div class="signup-card">
         <div class="brand-logo">VIPs</div>
@@ -219,6 +233,8 @@
         const submitBtn = document.getElementById('submit-btn');
         const pwInput = document.getElementById('signup-password');
         const toggleBtn = document.getElementById('toggle-btn');
+        const dashboardLink = document.getElementById('dashboard-link');
+        dashboardLink.href = localStorage.getItem('userRole') === 'employer' ? '../employer/home.html' : '../worker/profile.html';
 
         // Password Toggle Logic
         toggleBtn.addEventListener('click', () => {

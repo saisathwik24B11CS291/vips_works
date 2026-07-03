@@ -29,6 +29,19 @@
             justify-content: center;
             min-height: 100vh;
         }
+        .top-auth-link {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            color: var(--primary);
+            background: rgba(255,255,255,0.78);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 14px;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.85rem;
+        }
 
         .login-card {
             width: 100%;
@@ -161,6 +174,7 @@
     </style>
 </head>
 <body>
+    <a href="../worker/profile.html" class="top-auth-link" id="dashboard-link">Dashboard</a>
     <div class="login-card">
         <div class="brand-logo">VIPs</div>
         <h2>Sign in to Workers Portal</h2>
@@ -200,6 +214,8 @@
         const pwInput = document.getElementById('login-password');
         const toggleBtn = document.getElementById('toggle-btn');
         const googleBtnContainer = document.getElementById('google-btn');
+        const dashboardLink = document.getElementById('dashboard-link');
+        dashboardLink.href = localStorage.getItem('userRole') === 'employer' ? '../employer/home.html' : '../worker/profile.html';
 
         toggleBtn.addEventListener('click', () => {
             const isPw = pwInput.type === 'password';
@@ -343,6 +359,10 @@ async function handleCredentialResponse(resp){
         });
         const data = await res.json();
         if(res.ok){
+            if (data.role !== 'worker') {
+                alert('This is an employer account. Please use the Employer login page.');
+                return;
+            }
             localStorage.setItem('token', data.token);
             localStorage.setItem('username', data.username);
             localStorage.setItem('userRole', data.role);

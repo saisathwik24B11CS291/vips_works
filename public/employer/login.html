@@ -8,6 +8,7 @@
     <style>
         :root { --bg-dark: #000; --card-bg: #111; --accent-blue: #3b82f6; --text-gray: #94a3b8; --border-color: #222; }
         body { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .top-auth-link { position: fixed; top: 18px; right: 18px; color: white; background: #111; border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 14px; text-decoration: none; font-weight: 800; font-size: 13px; }
         .auth-card { width: 100%; max-width: 400px; padding: 20px; text-align: center; }
         .logo-circle { width: 60px; height: 60px; background: var(--accent-blue); border-radius: 15px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
         .input-group { margin-bottom: 20px; text-align: left; }
@@ -17,6 +18,7 @@
     </style>
 </head>
 <body>
+<a href="home.html" class="top-auth-link" id="dashboard-link">Dashboard</a>
 
 <div class="auth-card">
     <div class="logo-circle">E</div>
@@ -57,6 +59,7 @@
         const username = document.getElementById('login-username').value;
         const password = document.getElementById('login-password').value;
         const btn = document.querySelector('.login-btn');
+        document.getElementById('dashboard-link').href = localStorage.getItem('userRole') === 'worker' ? '../worker/profile.html' : 'home.html';
 
         btn.innerText = "Authenticating...";
 
@@ -167,6 +170,10 @@
             });
             const data = await res.json();
             if(res.ok){
+                if (data.role !== 'employer') {
+                    alert('This is a worker account. Please use the Worker login page.');
+                    return;
+                }
                 localStorage.clear();
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('userRole', data.role);

@@ -166,13 +166,22 @@
         <div class="card worker" onclick="selectRole('worker')">
             <div class="icon-circle"></div>
             <h3>Worker</h3>
-            <p>Showcase your expertise to high-end clients and secure premium opportunities.</p>
+            <p>Showcase your expertise to clients and secure new work opportunities.</p>
             <button class="action-btn btn-green">Continue as Worker</button>
         </div>
     </div>
 </div>
 
-<script>
+    <script>
+    (function routeReturningUser() {
+        const role = localStorage.getItem('userRole');
+        const token = localStorage.getItem('token');
+        if (token && role === 'employer') window.location.replace('./employer/home.html');
+        if (token && role === 'worker') window.location.replace('./worker/profile.html');
+        if (!token && role === 'employer') window.location.replace('./employer/login.html');
+        if (!token && role === 'worker') window.location.replace('./worker/login.html');
+    })();
+
     /**
      * Logic to handle role selection and routing.
      * This correctly targets your sub-folders: /public/employer/ and /public/worker/
@@ -183,9 +192,9 @@
         
         // Navigation based on folder architecture
         if (role === 'employer') {
-            window.location.href = './employer/signup.html';
+            window.location.href = './employer/login.html';
         } else {
-            window.location.href = './worker/signup.html';
+            window.location.href = './worker/login.html';
         }
     }
 </script>
