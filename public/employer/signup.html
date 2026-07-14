@@ -107,8 +107,6 @@
     async function handleSignup(event) {
     event.preventDefault();
 
-    // 1. Capture elements to avoid 'null' reading errors
-
     const usernameEl = document.getElementById('username');
     const emailEl = document.getElementById('email');
     const passwordEl = document.getElementById('password');
@@ -121,9 +119,6 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating Account...';
 
-    // 2. Extract values safely
-    
-    // 4. Create the payload
     const signupData = {
         role: 'employer',
         username: usernameEl.value.trim(),
@@ -134,8 +129,15 @@
         businessCategory: "General Business"
     };
 
+    if (!signupData.username || !signupData.email || !signupData.password || !signupData.phone) {
+        messageEl.style.color = '#ef4444';
+        messageEl.textContent = 'Please fill in all fields.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get Started';
+        return;
+    }
+
     try {
-        // Use the absolute URL since your server is on Port 5000
         const response = await fetch(window.location.origin + "/api/auth/signup", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -157,7 +159,6 @@
                 window.location.href = '../auth/signup-verify.html';
             }, 1500);
         } else {
-            // Displays the error from the server (like "next is not a function" or "Email exists")
             messageEl.style.color = '#ef4444';
             messageEl.textContent = result.error || result.message || "Signup failed";
             submitBtn.disabled = false;

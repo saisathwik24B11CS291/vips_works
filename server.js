@@ -374,6 +374,10 @@ function normalizeUsername(username){
     return String(username || '').trim();
 }
 
+function normalizeRole(role) {
+    return role === 'employer' ? 'employer' : role === 'worker' ? 'worker' : null;
+}
+
 function escapeRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -476,6 +480,21 @@ async function findUserByUsername(username) {
     const worker = await Worker.findOne({ username: exactCaseInsensitive });
     if (worker) return worker;
     return Employer.findOne({ username: exactCaseInsensitive });
+}
+
+async function createAvailableUsername(baseName) {
+    const cleaned = normalizeUsername(baseName)
+        .replace(/[^\w.-]+/g, '')
+        .slice(0, 30) || 'user';
+    let candidate = cleaned;
+    let suffix = 0;
+
+    while (await findUserByUsername(candidate)) {
+        suffix += 1;
+        candidate = `${cleaned.slice(0, 24)}${suffix}`;
+    }
+
+    return candidate;
 }
 
 function getExperienceLevel(completedJobs = 0) {
@@ -661,11 +680,25 @@ app.post('/api/auth/signup', async (req, res) => {
     const { role, username, email, password, phone, businessCategory } = req.body;
 
     try {
+        const signupRole = normalizeRole(role);
         const normalizedUsername = normalizeUsername(username);
         const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = String(phone || '').trim();
 
-        if (!normalizedUsername || !normalizedEmail || !password) {
+        if (!signupRole) {
+            return res.status(400).json({ error: "Invalid account type" });
+        }
+
+        if (!normalizedUsername || !normalizedEmail || !password || !normalizedPhone) {
             return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        if (normalizedUsername.length < 3) {
+            return res.status(400).json({ error: "Username must be at least 3 characters." });
+        }
+
+        if (String(password).length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters." });
         }
 
         if (!isValidEmailSyntax(normalizedEmail)) {
@@ -692,7 +725,6 @@ app.post('/api/auth/signup', async (req, res) => {
         await cleanupExpiredSignupOtps();
         await removePendingSignupIndexes();
 
-        const signupRole = role === 'employer' ? 'employer' : 'worker';
         const code = generateCode();
         const token = createSignupToken();
         const pendingSignup = {
@@ -700,8 +732,8 @@ app.post('/api/auth/signup', async (req, res) => {
             username: normalizedUsername,
             email: normalizedEmail,
             passwordHash: await bcrypt.hash(password, 10),
-            phone: String(phone || '').trim(),
-            businessCategory,
+            phone: normalizedPhone,
+            businessCategory: signupRole === 'employer' ? String(businessCategory || 'General Business').trim() : '',
             codeHash: await bcrypt.hash(code, 10),
             expiresAt: new Date(Date.now() + SIGNUP_OTP_TTL_MS),
             attempts: 0
@@ -854,8 +886,14 @@ app.post('/api/auth/login', async (req, res) => {
     const SECRET = JWT_SECRET;
 
     try {
-        const loginRole = role === 'employer' ? 'employer' : role === 'worker' ? 'worker' : null;
-        const user = await findUserByEmail(username, loginRole);
+        const loginRole = normalizeRole(role);
+        const identifier = String(username || '').trim();
+
+        if (!identifier || !password) {
+            return res.status(400).json({ message: 'Username/email and password are required' });
+        }
+
+        const user = await findUserByEmail(identifier, loginRole);
         
         if (!user) {
             return res.status(400).json({ message: 'User not found' });
@@ -888,7 +926,7 @@ app.post('/api/auth/google', async (req, res) => {
         const name = payload.name || payload.email.split('@')[0];
         const googleId = payload.sub;
 
-        const pickedRole = role === 'employer' ? 'employer' : 'worker';
+        const pickedRole = normalizeRole(role) || 'worker';
         const existingAccount = await findUserByEmailOnly(email);
         if (existingAccount && existingAccount.role !== pickedRole) {
             return res.status(403).json({
@@ -899,10 +937,11 @@ app.post('/api/auth/google', async (req, res) => {
         // find existing
         let user = existingAccount?.user || null;
         if(!user){
+            const username = await createAvailableUsername(name || email.split('@')[0]);
             if(pickedRole === 'employer'){
-                user = new Employer({ username: name, email, password: await bcrypt.hash(googleId, 10), role:'employer', loginProvider:'google' });
+                user = new Employer({ username, email, password: await bcrypt.hash(googleId, 10), role:'employer', loginProvider:'google', companyName: username });
             }else{
-                user = new Worker({ username: name, email, password: await bcrypt.hash(googleId, 10), role:'worker', loginProvider:'google' });
+                user = new Worker({ username, email, password: await bcrypt.hash(googleId, 10), role:'worker', loginProvider:'google' });
             }
             await user.save();
         }else{

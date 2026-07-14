@@ -246,22 +246,25 @@
         signupForm.addEventListener('submit', async (e) => {
             e.preventDefault(); 
 
-            // Disable button and show processing state
             submitBtn.disabled = true;
             submitBtn.innerText = "Creating Account...";
             messagePara.innerText = "";
 
-            // 1. Get the role saved from index.html (default to 'worker' if missing)
-            const role = localStorage.getItem('userRole') || 'worker';
-
-            // 2. Match IDs exactly to the inputs
+            const role = 'worker';
             const username = document.getElementById('signup-username').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = pwInput.value;
             const phone = document.getElementById('phone').value.trim();
 
+            if (!username || !email || !password || !phone) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Register Account";
+                messagePara.style.color = "var(--error)";
+                messagePara.innerText = "Please fill in all fields.";
+                return;
+            }
+
             try {
-                // 3. Connect to your server
                 const response = await fetch(window.location.origin + "/api/auth/signup", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -286,14 +289,14 @@
                     submitBtn.disabled = false;
                     submitBtn.innerText = "Register Account";
                     messagePara.style.color = "var(--error)";
-                    messagePara.innerText = "Error: " + (data.error || data.message);
+                    messagePara.innerText = data.error || data.message || "Signup failed";
                 }
             } catch (err) {
                 console.error("Signup error:", err);
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Register Account";
                 messagePara.style.color = "var(--error)";
-                messagePara.innerText = "Server connection failed. Is port 5000 running?";
+                messagePara.innerText = "Server connection failed. Please check that the backend is running.";
             }
         });
     });

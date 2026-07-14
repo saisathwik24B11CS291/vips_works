@@ -229,8 +229,16 @@
     submitBtn.innerText = "Processing...";
     messagePara.innerText = "";
 
-    const username = document.getElementById('login-username').value;
+    const username = document.getElementById('login-username').value.trim();
     const password = pwInput.value;
+
+    if (!username || !password) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Continue";
+        messagePara.style.color = "#ef4444";
+        messagePara.innerText = "Please enter your username or email and password.";
+        return;
+    }
 
     try {
         const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -363,11 +371,12 @@ async function handleCredentialResponse(resp){
                 alert('This is an employer account. Please use the Employer login page.');
                 return;
             }
+            localStorage.clear();
             localStorage.setItem('token', data.token);
             localStorage.setItem('username', data.username);
             localStorage.setItem('userRole', data.role);
             localStorage.setItem('userId', data.userId);
-            window.location.href = "../worker/profile.html";
+            window.location.replace("../worker/profile.html");
         }else{
             alert(data.message || 'Google login failed');
         }
@@ -376,9 +385,9 @@ async function handleCredentialResponse(resp){
     }
 }
 
-window.onload = ()=> {
+window.addEventListener('load', () => {
     initGoogle();
-};
+});
 </script>
 
     <script src="../js/i18n.js"></script>
