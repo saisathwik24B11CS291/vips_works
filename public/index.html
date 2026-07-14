@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIP Services | Gateway</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/premium-nav.css">
     <style>
         :root {
             --bg-dark: #000000;
@@ -173,15 +174,6 @@
 </div>
 
     <script>
-    (function routeReturningUser() {
-        const role = localStorage.getItem('userRole');
-        const token = localStorage.getItem('token');
-        if (token && role === 'employer') window.location.replace('./employer/home.html');
-        if (token && role === 'worker') window.location.replace('./worker/profile.html');
-        if (!token && role === 'employer') window.location.replace('./employer/login.html');
-        if (!token && role === 'worker') window.location.replace('./worker/login.html');
-    })();
-
     /**
      * Logic to handle role selection and routing.
      * This correctly targets your sub-folders: /public/employer/ and /public/worker/
@@ -201,5 +193,6 @@
 
 
     <script src="js/i18n.js"></script>
+    <script src="js/premium-nav.js"></script>
 </body>
 </html>
