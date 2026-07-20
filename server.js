@@ -18,7 +18,6 @@ const JobInvite = require("./models/JobInvite");
 const JobApplication = require("./models/JobApplication");
 const helmet = require('helmet');
 const morgan = require('morgan');
-const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change_me_in_env') {
@@ -39,18 +38,16 @@ const Worker = require('./models/Worker');
 const Message = require('./models/Message');
 const Post = require('./models/Post'); 
 const Employer = require('./models/Employer'); 
-const PendingSignup = require('./models/PendingSignup');
 const Review = require('./models/Review');
 
 const app = express();
 const saltRounds = 10;
 const isProduction = process.env.NODE_ENV === 'production';
-const SIGNUP_OTP_TTL_MS = 15 * 60 * 1000;
 app.set('trust proxy', 1);
 
 
 
-// Mail + Google clients
+// Mail + Google clients. Signup intentionally does not use email.
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.trim() : '';
 function cleanEnv(name) {
     return process.env[name] ? String(process.env[name]).trim() : '';
@@ -58,66 +55,30 @@ function cleanEnv(name) {
 
 const RESEND_API_KEY = cleanEnv('RESEND_API_KEY');
 const RESEND_FROM = cleanEnv('MAIL_FROM');
-const SMTP_HOST = cleanEnv('SMTP_HOST');
-const SMTP_USER = cleanEnv('SMTP_USER');
-const SMTP_PASS = process.env.SMTP_PASS ? String(process.env.SMTP_PASS).replace(/\s+/g, '') : '';
-const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
-const SMTP_FROM_ADDRESS = cleanEnv('SMTP_FROM') || SMTP_USER;
-const hasSmtpConfig = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && SMTP_FROM_ADDRESS);
 const hasResendConfig = Boolean(RESEND_API_KEY && RESEND_FROM);
-const activeMailProvider = hasSmtpConfig ? 'smtp' : hasResendConfig ? 'resend' : 'none';
+const activeMailProvider = hasResendConfig ? 'resend' : 'none';
 
 console.log('MAIL CONFIG:', {
     provider: activeMailProvider,
     resendApiKey: RESEND_API_KEY ? '[SET]' : '[MISSING]',
-    resendFrom: RESEND_FROM ? '[SET]' : '[MISSING]',
-    smtpHost: SMTP_HOST ? '[SET]' : '[MISSING]',
-    smtpUser: SMTP_USER ? '[SET]' : '[MISSING]',
-    smtpPass: SMTP_PASS ? '[SET]' : '[MISSING]',
-    smtpFrom: SMTP_FROM_ADDRESS ? '[SET]' : '[MISSING]'
+    resendFrom: RESEND_FROM ? '[SET]' : '[MISSING]'
 });
-
-const mailTransporter = (() => {
-    if (hasSmtpConfig) {
-        return nodemailer.createTransport({
-            host: SMTP_HOST,
-            port: SMTP_PORT,
-            secure: SMTP_SECURE,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            connectionTimeout: 15000,
-            greetingTimeout: 10000,
-            socketTimeout: 20000
-        });
-    }
-    return null;
-})();
 
 function getEmailConfigStatus() {
     return {
         provider: activeMailProvider === 'none' ? null : activeMailProvider,
         resendApiKeyConfigured: Boolean(RESEND_API_KEY),
-        mailFromConfigured: Boolean(RESEND_FROM || SMTP_FROM_ADDRESS),
-        resendFromConfigured: Boolean(RESEND_FROM),
-        smtpHostConfigured: Boolean(SMTP_HOST),
-        smtpUserConfigured: Boolean(SMTP_USER),
-        smtpPassConfigured: Boolean(SMTP_PASS),
-        smtpFromConfigured: Boolean(SMTP_FROM_ADDRESS),
-        smtpConfigured: hasSmtpConfig
+        mailFromConfigured: Boolean(RESEND_FROM),
+        resendFromConfigured: Boolean(RESEND_FROM)
     };
 }
 
 function getMailErrorMessage(err){
     const code = err?.code || err?.responseCode || '';
-    const response = err?.response || err?.message || '';
-
     if (code === 'EMAIL_NOT_CONFIGURED') {
         const missing = [];
-        if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
-        if (!RESEND_FROM && !SMTP_FROM_ADDRESS) missing.push('MAIL_FROM or SMTP_FROM');
+        if (!RESEND_API_KEY) missing.push('RESEND_API_KEY');
+        if (!RESEND_FROM) missing.push('MAIL_FROM');
         return `Email service is not configured on the running server. Missing: ${missing.join(', ') || 'email settings'}. Check Render environment variables, save changes, then redeploy/restart the service.`;
     }
     if (err?.provider === 'resend') {
@@ -139,29 +100,10 @@ function getMailErrorMessage(err){
         }
         return err.message || 'Email API could not send OTP. Check your Resend sender/domain settings.';
     }
-    if(!mailTransporter){
-        return 'Email service is not configured. Add RESEND_API_KEY or SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) plus MAIL_FROM in Render environment variables.';
-    }
-    if(code === 'EAUTH' || response.includes('Invalid login') || response.includes('Username and Password not accepted')){
-        return 'Gmail SMTP authentication failed. Use a Google App Password for SMTP_PASS.';
-    }
-    if(code === 'ECONNECTION' || code === 'ETIMEDOUT' || code === 'ESOCKET'){
-        return 'Could not connect to Gmail SMTP. If this is running on Render Free, SMTP ports 25, 465, and 587 are blocked; use a paid Render instance or an email HTTP API provider.';
-    }
-    return 'Could not send OTP email. Check Gmail SMTP settings.';
+    return 'Email API is not configured. Set RESEND_API_KEY and MAIL_FROM to enable email notifications.';
 }
 
 async function sendEmail({ to, subject, text, html }) {
-    if (mailTransporter) {
-        return mailTransporter.sendMail({
-            from: SMTP_FROM_ADDRESS,
-            to,
-            subject,
-            text,
-            html
-        });
-    }
-
     if (hasResendConfig) {
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -196,8 +138,8 @@ async function sendEmail({ to, subject, text, html }) {
     }
 
     const missing = [];
-    if (!RESEND_API_KEY && !hasSmtpConfig) missing.push('RESEND_API_KEY or SMTP credentials');
-    if (!RESEND_FROM && !SMTP_FROM_ADDRESS) missing.push('MAIL_FROM or SMTP_FROM');
+    if (!RESEND_API_KEY) missing.push('RESEND_API_KEY');
+    if (!RESEND_FROM) missing.push('MAIL_FROM');
     const err = new Error(`No email provider configured. Missing ${missing.join(' and ') || 'email settings'}.`);
     err.code = 'EMAIL_NOT_CONFIGURED';
     throw err;
