@@ -16,7 +16,6 @@ const dns = require('dns').promises;
 const crypto = require('crypto');
 const JobInvite = require("./models/JobInvite");
 const JobApplication = require("./models/JobApplication");
-const PendingSignup = require('./models/PendingSignup');
 const Job = require('./models/job');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -46,6 +45,11 @@ const app = express();
 const saltRounds = 10;
 const isProduction = process.env.NODE_ENV === 'production';
 app.set('trust proxy', 1);
+
+const TOKEN_TTL = process.env.JWT_EXPIRES_IN || '24h';
+const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+const MAX_JSON_SIZE = process.env.MAX_JSON_SIZE || '1mb';
+const MAX_UPLOAD_SIZE = Number.parseInt(process.env.MAX_UPLOAD_SIZE || `${5 * 1024 * 1024}`, 10);
 
 
 
@@ -179,7 +183,7 @@ const authMiddleware = async (req, res, next) => {
 // --- MIDDLEWARE ---
 // --- SECURITY MIDDLEWARE ---
 app.disable('x-powered-by');
-const allowedOrigins = (process.env.CORS_ORIGINS || '*').split(',').map(o=>o.trim());
+const allowedOrigins = (process.env.CORS_ORIGINS || (isProduction ? '' : '*')).split(',').map(o=>o.trim()).filter(Boolean);
 app.use(cors({
     origin: (origin, cb)=>{
         if(!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)){
@@ -198,7 +202,21 @@ app.use((req,res,next)=>{
 });
 // helmet with relaxed CSP (to avoid breaking inline scripts)
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+            "default-src": ["'self'"],
+            "script-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://cdnjs.cloudflare.com"],
+            "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+            "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
+            "img-src": ["'self'", "data:", "blob:"],
+            "connect-src": ["'self'", "https://accounts.google.com"],
+            "frame-src": ["'self'", "https://accounts.google.com"],
+            "object-src": ["'none'"],
+            "base-uri": ["'self'"],
+            "form-action": ["'self'"]
+        }
+    },
     crossOriginResourcePolicy: false
 }));
 // request logging (skip noisy assets)
@@ -223,8 +241,33 @@ app.use('/api', (req,res,next)=>{
     }
     next();
 });
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+function createRateLimiter({ windowMs, max, keyPrefix }) {
+    const store = new Map();
+    return (req, res, next) => {
+        const identity = req.ip || req.connection.remoteAddress || 'global';
+        const key = `${keyPrefix}:${identity}`;
+        const now = Date.now();
+        const entry = store.get(key) || { count: 0, start: now };
+        if (now - entry.start > windowMs) {
+            entry.count = 0;
+            entry.start = now;
+        }
+        entry.count += 1;
+        store.set(key, entry);
+        if (entry.count > max) {
+            console.warn('Rate limit exceeded', { route: keyPrefix, ip: identity, path: req.originalUrl });
+            return res.status(429).json({ message: "Too many requests. Please try again later." });
+        }
+        next();
+    };
+}
+const authRateLimit = createRateLimiter({ keyPrefix: 'auth', windowMs: 15 * 60 * 1000, max: 20 });
+const signupRateLimit = createRateLimiter({ keyPrefix: 'signup', windowMs: 60 * 60 * 1000, max: 10 });
+const otpRateLimit = createRateLimiter({ keyPrefix: 'password-otp', windowMs: 15 * 60 * 1000, max: 10 });
+const messageRateLimit = createRateLimiter({ keyPrefix: 'message', windowMs: 60 * 1000, max: 30 });
+const inviteRateLimit = createRateLimiter({ keyPrefix: 'invite', windowMs: 60 * 1000, max: 20 });
+app.use(express.json({ limit: MAX_JSON_SIZE }));
+app.use(express.urlencoded({ extended: true, limit: MAX_JSON_SIZE }));
 // sanitize request body/query to strip $ keys / dots
 function sanitize(obj){
     if(!obj || typeof obj !== 'object') return;
@@ -295,14 +338,34 @@ app.get(/\/search\.html$/i, (req, res) => {
 });
 
 // ---  MULTER CONFIGURATION (Fixes "upload is not defined") ---
+const allowedUploadTypes = new Map([
+    ['image/jpeg', new Set(['.jpg', '.jpeg'])],
+    ['image/png', new Set(['.png'])],
+    ['image/webp', new Set(['.webp'])]
+]);
+function safeUploadFilename(prefix, file) {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    return `${prefix}-${crypto.randomBytes(16).toString('hex')}${ext}`;
+}
+function uploadFileFilter(req, file, cb) {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowedExts = allowedUploadTypes.get(file.mimetype);
+    if (!allowedExts || !allowedExts.has(ext)) {
+        return cb(new Error('Only JPG, JPEG, PNG and WEBP files are allowed'));
+    }
+    cb(null, true);
+}
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
+    destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'file-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, safeUploadFilename('file', file));
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage,
+    fileFilter: uploadFileFilter,
+    limits: { fileSize: MAX_UPLOAD_SIZE, files: 10 }
+});
 
 // --- ROUTES IMPORT ---
 const authRoutes = require('./routes/auth');
@@ -334,6 +397,54 @@ function escapeHtml(value) {
         '"': '&quot;',
         "'": '&#39;'
     }[char]));
+}
+
+function cleanText(value, max = 1000) {
+    return String(value ?? '')
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .replace(/[<>]/g, '')
+        .trim()
+        .slice(0, max);
+}
+
+function isValidPhone(phone) {
+    return /^[0-9+\-() ]{7,24}$/.test(String(phone || '').trim());
+}
+
+function validatePassword(password) {
+    const value = String(password || '');
+    if (value.length < 8 || value.length > 128) return 'Password must be 8-128 characters.';
+    if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value)) return 'Password must include letters and numbers.';
+    return null;
+}
+
+function isValidObjectId(id) {
+    return mongoose.Types.ObjectId.isValid(String(id || ''));
+}
+
+function publicUser(user) {
+    if (!user) return null;
+    const obj = typeof user.toObject === 'function' ? user.toObject() : { ...user };
+    delete obj.password;
+    delete obj.resetCode;
+    delete obj.resetCodeExpires;
+    delete obj.__v;
+    return obj;
+}
+
+function authRequired(req, res, next) {
+    return authMiddleware(req, res, next);
+}
+
+function requireRole(...roles) {
+    return (req, res, next) => {
+        if (!req.user) return res.status(401).json({ message: "Authentication required" });
+        if (!roles.includes(req.user.role)) {
+            console.warn('Permission denied', { userId: req.user._id?.toString(), role: req.user.role, path: req.originalUrl });
+            return res.status(403).json({ message: "Access denied" });
+        }
+        next();
+    };
 }
 
 function isValidEmailSyntax(email) {
@@ -490,76 +601,6 @@ async function addWorkerHistory(workerId, historyItem) {
     return worker;
 }
 
-async function cleanupExpiredSignupOtps() {
-    await PendingSignup.deleteMany({ expiresAt: { $lte: new Date() } });
-}
-
-async function removePendingSignupIndexes() {
-    try {
-        const indexes = await PendingSignup.collection.indexes();
-        for (const index of indexes) {
-            if (index.name === '_id_' || index.name === 'token_1' || index.name === 'expiresAt_1') continue;
-            if (index.key?.email || index.key?.username) {
-                await PendingSignup.collection.dropIndex(index.name);
-            }
-        }
-    } catch (err) {
-        console.warn('Pending signup index cleanup skipped:', err.message);
-    }
-}
-
-async function savePendingSignup(signupToken, pendingSignup) {
-    await PendingSignup.deleteMany({
-        $or: [
-            { email: pendingSignup.email },
-            { username: pendingSignup.username }
-        ]
-    });
-
-    try {
-        return await PendingSignup.create({ token: signupToken, ...pendingSignup });
-    } catch (err) {
-        const isPendingDuplicate =
-            err?.code === 11000 &&
-            String(err?.collection || err?.message || '').toLowerCase().includes('pendingsignups');
-
-        if (!isPendingDuplicate) throw err;
-
-        await removePendingSignupIndexes();
-        await PendingSignup.deleteMany({
-            $or: [
-                { email: pendingSignup.email },
-                { username: pendingSignup.username }
-            ]
-        });
-        return PendingSignup.create({ token: signupToken, ...pendingSignup });
-    }
-}
-
-function createSignupToken() {
-    return crypto.randomBytes(32).toString('hex');
-}
-
-async function sendSignupOtpEmail(email, code, pendingSignup) {
-    const roleLabel = pendingSignup.role === 'employer' ? 'Employer' : 'Worker';
-    const safeName = escapeHtml(pendingSignup.username || 'VIPs user');
-    const safeRoleLabel = escapeHtml(roleLabel);
-
-    return sendEmail({
-        to: email,
-        subject: 'Your VIPs signup OTP',
-        text: `Hi ${pendingSignup.username},\n\nYour VIPs ${roleLabel} signup OTP is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`,
-        html: `
-            <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px;">
-                <h2 style="margin:0 0 8px;color:#0f172a;">Verify your VIPs ${safeRoleLabel} account</h2>
-                <p style="color:#475569;">Hi ${safeName}, enter this OTP to finish creating your account.</p>
-                <div style="font-size:32px;letter-spacing:8px;font-weight:800;color:#2563eb;background:#eff6ff;padding:18px;text-align:center;border-radius:12px;">${code}</div>
-                <p style="color:#64748b;font-size:13px;">This code expires in 15 minutes. If you did not request it, ignore this email.</p>
-            </div>
-        `
-    });
-}
-
 async function sendWelcomeEmail(email, user) {
     const roleLabel = user.role === 'employer' ? 'Employer' : 'Worker';
     const name = user.username || 'VIPs user';
@@ -569,7 +610,7 @@ async function sendWelcomeEmail(email, user) {
     return sendEmail({
         to: email,
         subject: `Welcome to VIPs, ${name}`,
-        text: `Hi ${name},\n\nWelcome to VIPs ${roleLabel}.\n\nYour account is ready. Keep your profile details accurate, use a real phone number and email, and never share your password or OTP with anyone.\n\nThank you for joining VIPs.`,
+        text: `Hi ${name},\n\nWelcome to VIPs ${roleLabel}.\n\nYour account is ready. Keep your profile details accurate, use a real phone number and email, and never share your password with anyone.\n\nThank you for joining VIPs.`,
         html: `
             <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a;">
                 <h2 style="margin:0 0 12px;">Welcome to VIPs ${safeRoleLabel}</h2>
@@ -577,7 +618,7 @@ async function sendWelcomeEmail(email, user) {
                 <ul>
                     <li>Keep your profile details accurate.</li>
                     <li>Use a real phone number and email for account recovery.</li>
-                    <li>Never share your password or OTP with anyone.</li>
+                    <li>Never share your password with anyone.</li>
                 </ul>
                 <p style="color:#64748b;font-size:13px;">Thank you for joining VIPs.</p>
             </div>
@@ -631,12 +672,12 @@ async function getOptionalViewer(req) {
 
 // --- AUTH ROUTES ---
 // Unified Signup: Handles both Worker and Employer safely
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', signupRateLimit, async (req, res) => {
     const { role, username, email, password, phone, businessCategory } = req.body;
 
     try {
         const signupRole = normalizeRole(role);
-        const normalizedUsername = normalizeUsername(username);
+        const normalizedUsername = cleanText(normalizeUsername(username), 40);
         const normalizedEmail = normalizeEmail(email);
         const normalizedPhone = String(phone || '').trim();
 
@@ -648,12 +689,17 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        if (normalizedUsername.length < 3) {
-            return res.status(400).json({ error: "Username must be at least 3 characters." });
+        if (!/^[a-zA-Z0-9_. -]{3,40}$/.test(normalizedUsername)) {
+            return res.status(400).json({ error: "Username must be 3-40 characters and use letters, numbers, spaces, dots, underscores or hyphens." });
         }
 
-        if (String(password).length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters." });
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return res.status(400).json({ error: passwordError });
+        }
+
+        if (!isValidPhone(normalizedPhone)) {
+            return res.status(400).json({ error: "Enter a valid phone number." });
         }
 
         if (!isValidEmailSyntax(normalizedEmail)) {
@@ -677,48 +723,35 @@ app.post('/api/auth/signup', async (req, res) => {
             });
         }
 
-        await cleanupExpiredSignupOtps();
-        await removePendingSignupIndexes();
-
-        const code = generateCode();
-        const token = createSignupToken();
-        const pendingSignup = {
+        const signupData = {
             role: signupRole,
             username: normalizedUsername,
             email: normalizedEmail,
-            passwordHash: await bcrypt.hash(password, 10),
+            passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS),
             phone: normalizedPhone,
-            businessCategory: signupRole === 'employer' ? String(businessCategory || 'General Business').trim() : '',
-            codeHash: await bcrypt.hash(code, 10),
-            expiresAt: new Date(Date.now() + SIGNUP_OTP_TTL_MS),
-            attempts: 0
+            businessCategory: signupRole === 'employer' ? cleanText(businessCategory || 'General Business', 80) : ''
         };
 
-        await savePendingSignup(token, pendingSignup);
+        const createdUser = await createUserFromSignupData(signupData);
+        const token = jwt.sign({ id: createdUser._id, role: createdUser.role }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+        const redirect = createdUser.role === 'employer' ? '../employer/home.html' : '../worker/home.html';
 
-        try {
-            await sendSignupOtpEmail(normalizedEmail, code, pendingSignup);
-        } catch (mailErr) {
-            await PendingSignup.deleteOne({ token });
-            console.error("Signup OTP Email Error:", mailErr);
-            return res.status(503).json({ error: getMailErrorMessage(mailErr) });
-        }
+        sendWelcomeEmail(normalizedEmail, createdUser).catch((mailErr) => {
+            console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
+        });
 
-        res.status(200).json({
-            message: `OTP sent to ${maskEmail(normalizedEmail)}`,
-            otpRequired: true,
-            signupToken: token,
-            email: normalizedEmail,
-            maskedEmail: maskEmail(normalizedEmail),
-            role: signupRole
+        res.status(201).json({
+            message: "Account created successfully.",
+            role: createdUser.role,
+            userId: createdUser._id,
+            token,
+            redirect,
+            username: createdUser.username
         });
     } catch (err) { 
         console.error("Signup Error:", err);
         if (err?.code === 11000) {
             const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
-            if (isDuplicateFromCollection(err, 'pendingsignups')) {
-                return res.status(400).json({ error: "OTP already sent for this signup. Please open the OTP page or try again." });
-            }
             if (field === 'username' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
                 return res.status(400).json({ error: "Change username. It is already used by someone." });
             }
@@ -726,117 +759,14 @@ app.post('/api/auth/signup', async (req, res) => {
                 return res.status(400).json({ error: "This email is already registered. Please login or use another email." });
             }
         }
-        res.status(500).json({ error: err.message }); 
+        res.status(500).json({ error: "Signup failed" }); 
     }
 });
 
-app.post('/api/auth/signup/verify', async (req, res) => {
-    try {
-        const { signupToken, code } = req.body;
-        await cleanupExpiredSignupOtps();
-
-        if (!signupToken || !code) {
-            return res.status(400).json({ message: "Signup session and OTP are required" });
-        }
-
-        const pendingSignup = await PendingSignup.findOne({ token: signupToken });
-        if (!pendingSignup) {
-            return res.status(400).json({ message: "Signup OTP expired. Please register again." });
-        }
-
-        if (pendingSignup.expiresAt < new Date()) {
-            await PendingSignup.deleteOne({ token: signupToken });
-            return res.status(400).json({ message: "Signup OTP expired. Please register again." });
-        }
-
-        pendingSignup.attempts += 1;
-        if (pendingSignup.attempts > 5) {
-            await PendingSignup.deleteOne({ token: signupToken });
-            return res.status(429).json({ message: "Too many wrong OTP attempts. Please register again." });
-        }
-        await pendingSignup.save();
-
-        const isCodeValid = await bcrypt.compare(String(code).trim(), pendingSignup.codeHash);
-        if (!isCodeValid) {
-            return res.status(400).json({ message: "Invalid OTP" });
-        }
-
-        const existingUsername = await findUserByUsername(pendingSignup.username);
-        if (existingUsername) {
-            await PendingSignup.deleteOne({ token: signupToken });
-            return res.status(400).json({ message: "Change username. It is already used by someone." });
-        }
-
-        const existingUser = await findUserByEmailOnly(pendingSignup.email);
-        if (existingUser) {
-            await PendingSignup.deleteOne({ token: signupToken });
-            return res.status(400).json({
-                message: `This email is already registered as a ${existingUser.role} account. Please login or use another email.`
-            });
-        }
-
-        const createdUser = await createUserFromSignupData(pendingSignup);
-        await PendingSignup.deleteOne({ token: signupToken });
-
-        sendWelcomeEmail(pendingSignup.email, createdUser).catch((mailErr) => {
-            console.error("Welcome Email Error:", getMailErrorMessage(mailErr));
-        });
-
-        const token = jwt.sign({ id: createdUser._id, role: createdUser.role }, JWT_SECRET, { expiresIn: '24h' });
-        const redirect = createdUser.role === 'employer' ? '../employer/home.html' : '../worker/home.html';
-
-        res.status(201).json({
-            message: "Email verified. Account created successfully.",
-            role: createdUser.role,
-            userId: createdUser._id,
-            token,
-            redirect,
-            username: createdUser.username
-        });
-    } catch (err) {
-        console.error("Signup OTP verify error", err);
-        if (err?.code === 11000) {
-            const field = Object.keys(err.keyPattern || err.keyValue || {})[0] || 'account';
-            if (isDuplicateFromCollection(err, 'pendingsignups')) {
-                return res.status(400).json({ message: "OTP already sent for this signup. Please open the OTP page or try again." });
-            }
-            if (field === 'username' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
-                return res.status(400).json({ message: "Change username. It is already used by someone." });
-            }
-            if (field === 'email' && (isDuplicateFromCollection(err, 'workers') || isDuplicateFromCollection(err, 'employers'))) {
-                return res.status(400).json({ message: "This email is already registered. Please login or use another email." });
-            }
-        }
-        res.status(500).json({ message: "Failed to verify signup OTP" });
-    }
-});
-
-app.post('/api/auth/signup/resend', async (req, res) => {
-    try {
-        const { signupToken } = req.body;
-        await cleanupExpiredSignupOtps();
-
-        if (!signupToken) return res.status(400).json({ message: "Signup session is required" });
-        const pendingSignup = await PendingSignup.findOne({ token: signupToken });
-        if (!pendingSignup) return res.status(400).json({ message: "Signup OTP expired. Please register again." });
-
-        const code = generateCode();
-        pendingSignup.codeHash = await bcrypt.hash(code, 10);
-        pendingSignup.expiresAt = new Date(Date.now() + SIGNUP_OTP_TTL_MS);
-        pendingSignup.attempts = 0;
-        await pendingSignup.save();
-
-        await sendSignupOtpEmail(pendingSignup.email, code, pendingSignup);
-        res.json({ message: `New OTP sent to ${maskEmail(pendingSignup.email)}` });
-    } catch (err) {
-        console.error("Signup OTP resend error", err);
-        res.status(503).json({ message: getMailErrorMessage(err) });
-    }
-});
 // Unified Login: Searches across both collections
 // Unified Login Logic in server.js
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authRateLimit, async (req, res) => {
     const { username, password, role } = req.body;
     const SECRET = JWT_SECRET;
 
@@ -851,26 +781,28 @@ app.post('/api/auth/login', async (req, res) => {
         const user = await findUserByEmail(identifier, loginRole);
         
         if (!user) {
-            return res.status(400).json({ message: 'User not found' });
+            console.warn('Failed login: account not found', { identifier, role: loginRole || 'any', ip: req.ip });
+            return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
+            console.warn('Failed login: bad password', { userId: user._id?.toString(), role: user.role, ip: req.ip });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         // Generate the token
-        const token = jwt.sign({ id: user._id, role: user.role }, SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: user._id, role: user.role }, SECRET, { expiresIn: TOKEN_TTL });
 
         res.json({ token, role: user.role, userId: user._id, username: user.username });
     } catch (error) { 
-    console.log("FULL LOGIN ERROR:", error); // This shows why it's failing in your terminal
+    console.error("Login error:", error.message);
     res.status(500).json({ message: 'Login Error' }); 
 }
 });
 
 // Google Sign-in
-app.post('/api/auth/google', async (req, res) => {
+app.post('/api/auth/google', authRateLimit, async (req, res) => {
     try{
         const { idToken, role } = req.body; // role optional, default worker
         if(!GOOGLE_CLIENT_ID) return res.status(500).json({message:"Google client not configured"});
@@ -894,9 +826,9 @@ app.post('/api/auth/google', async (req, res) => {
         if(!user){
             const username = await createAvailableUsername(name || email.split('@')[0]);
             if(pickedRole === 'employer'){
-                user = new Employer({ username, email, password: await bcrypt.hash(googleId, 10), role:'employer', loginProvider:'google', companyName: username });
+                user = new Employer({ username, email, password: await bcrypt.hash(googleId, BCRYPT_ROUNDS), role:'employer', loginProvider:'google', companyName: username });
             }else{
-                user = new Worker({ username, email, password: await bcrypt.hash(googleId, 10), role:'worker', loginProvider:'google' });
+                user = new Worker({ username, email, password: await bcrypt.hash(googleId, BCRYPT_ROUNDS), role:'worker', loginProvider:'google' });
             }
             await user.save();
         }else{
@@ -904,7 +836,7 @@ app.post('/api/auth/google', async (req, res) => {
             await user.save();
         }
 
-        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_TTL });
         res.json({ token, role: user.role, userId: user._id, username: user.username });
     }catch(err){
         console.error("Google auth error", err);
@@ -968,7 +900,7 @@ function validateResetToken(resetToken, email) {
     return decoded;
 }
 
-app.post('/api/auth/forgot', async (req,res)=>{
+app.post('/api/auth/forgot', otpRateLimit, async (req,res)=>{
     try{
         const { email, identifier, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
@@ -979,7 +911,7 @@ app.post('/api/auth/forgot', async (req,res)=>{
         const accountEmail = normalizeEmail(user.email);
         if(!accountEmail) return res.status(400).json({message:"This account does not have an email address"});
         const code = generateCode();
-        user.resetCode = code;
+        user.resetCode = await bcrypt.hash(code, BCRYPT_ROUNDS);
         user.resetCodeExpires = new Date(Date.now()+15*60*1000);
         await user.save();
         try {
@@ -1007,7 +939,7 @@ app.post('/api/auth/forgot', async (req,res)=>{
     }
 });
 
-app.post('/api/auth/verify-otp', async (req,res)=>{
+app.post('/api/auth/verify-otp', otpRateLimit, async (req,res)=>{
     try{
         const { email, identifier, code, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
@@ -1015,11 +947,12 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
         if(!accountIdentifier || !code) return res.status(400).json({message:"Email or username and OTP are required"});
         const user = await findUserByEmail(accountIdentifier, recoveryRole);
         if(!user || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
-        if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
+        const otpMatches = await bcrypt.compare(String(code || '').trim(), user.resetCode);
+        if(!otpMatches) return res.status(400).json({message:"Invalid OTP"});
         if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
         const accountEmail = normalizeEmail(user.email);
 
-        const authToken = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
+        const authToken = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: TOKEN_TTL });
         const resetToken = jwt.sign(
             { id:user._id, role:user.role, email:accountEmail, purpose:'password-reset' },
             JWT_SECRET,
@@ -1043,13 +976,15 @@ app.post('/api/auth/verify-otp', async (req,res)=>{
     }
 });
 
-app.post('/api/auth/reset', async (req,res)=>{
+app.post('/api/auth/reset', authRateLimit, async (req,res)=>{
     try{
         const { email, identifier, code, newPassword, resetToken, role } = req.body;
         const accountIdentifier = String(identifier || email || '').trim();
         const accountEmailFromRequest = normalizeEmail(email);
         const recoveryRole = role === 'employer' ? 'employer' : 'worker';
         if(!accountIdentifier || !newPassword) return res.status(400).json({message:"Missing fields"});
+        const passwordError = validatePassword(newPassword);
+        if (passwordError) return res.status(400).json({message: passwordError});
         let user = null;
         let decodedReset = null;
 
@@ -1074,18 +1009,19 @@ app.post('/api/auth/reset', async (req,res)=>{
             }
         }else{
             if(!code || !user.resetCode || !user.resetCodeExpires) return res.status(400).json({message:"Invalid OTP"});
-            if(user.resetCode !== code.trim()) return res.status(400).json({message:"Invalid OTP"});
+            const otpMatches = await bcrypt.compare(String(code || '').trim(), user.resetCode);
+            if(!otpMatches) return res.status(400).json({message:"Invalid OTP"});
             if(user.resetCodeExpires < new Date()) return res.status(400).json({message:"OTP expired"});
         }
 
-        user.password = await bcrypt.hash(newPassword, 10);
+        user.password = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
         user.resetCode = null;
         user.resetCodeExpires = null;
         user.loginProvider = 'local';
         await user.save();
         await sendPasswordChangedEmail(accountEmail, user);
 
-        const token = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign(buildAuthPayload(user), JWT_SECRET, { expiresIn: TOKEN_TTL });
         res.json({
             message:"Password changed successfully",
             token,
@@ -1108,7 +1044,7 @@ app.get('/api/auth/me', async (req, res) => {
         const user = await findUserById(decoded.id, decoded.role);
 
         if (!user) return res.status(404).json({ message: "User not found" });
-        const data = user.toObject ? user.toObject() : user;
+        const data = publicUser(user);
         if (data.role === 'employer') data.subscription = getSubscriptionState(data);
         res.json(data);
     } catch (err) { 
@@ -1134,7 +1070,7 @@ app.post('/api/settings/language', authMiddleware, async (req, res) => {
 });
 // --- SEARCH & PROFILE ---
 app.get('/api/users/search', async (req, res) => {
-    const query = String(req.query.q || "").trim();
+    const query = cleanText(req.query.q, 80);
     try {
         const regex = new RegExp(escapeRegex(query), 'i');
         const filter = query ? { username: regex } : {};
@@ -1150,7 +1086,7 @@ app.get('/api/users/search', async (req, res) => {
 
 app.get('/api/search/global', async (req, res) => {
     try {
-        const query = String(req.query.q || '').trim();
+        const query = cleanText(req.query.q, 80);
         if (!query) return res.json([]);
         const regex = new RegExp(escapeRegex(query), 'i');
         let viewerRole = '';
@@ -1309,29 +1245,25 @@ app.get('/api/employers/public/:id', async (req, res) => {
 
 
 // GET Settings for the settings page to load correctly
-app.get('/api/employer/settings', async (req, res) => {
+app.get('/api/employer/settings', authMiddleware, requireRole('employer'), async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await Employer.findById(decoded.id);
+        const user = await Employer.findById(req.user._id).select('settings');
+        if (!user) return res.status(404).json({ error: "Employer not found" });
         res.json(user.settings || { followToView: false, autoAccept: true });
     } catch (err) { res.status(500).json({ error: "Failed to load" }); }
 });
 // --- 1. UPDATED FOLLOW LOGIC (Instagram Style) ---
-app.post('/api/users/follow/:targetId', async (req, res) => {
+app.post('/api/users/follow/:targetId', authMiddleware, async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ message: "No token provided" }); // Safety line
-
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const myId = decoded.id;
+        const myId = req.user._id;
         const targetId = req.params.targetId;
+        if (!isValidObjectId(targetId)) return res.status(400).json({ message: "Invalid user id" });
 
-        if (myId === targetId) return res.status(400).json({ message: "Cannot follow yourself" });
+        if (myId.toString() === targetId.toString()) return res.status(400).json({ message: "Cannot follow yourself" });
 
         // 1. Find Target & Me
         let targetUser = await Worker.findById(targetId) || await Employer.findById(targetId);
-        let me = await Worker.findById(myId) || await Employer.findById(myId);
+        let me = req.user;
         
         if (!targetUser || !me) return res.status(404).json({ message: "User not found" });
 
@@ -1440,7 +1372,7 @@ app.get('/api/notifications/count', async (req, res) => {
 app.put('/api/profile/update', (req, res, next) => {
     // 1. Handle potential file upload first
     upload.single('profilePicture')(req, res, (err) => {
-        if (err) return res.status(500).json({ message: "File upload error: " + err.message });
+        if (err) return res.status(400).json({ message: "File upload error: " + err.message });
         next();
     });
 }, async (req, res) => {
@@ -1454,7 +1386,7 @@ app.put('/api/profile/update', (req, res, next) => {
 
         const updateData = {};
         const canUpdate = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
-        const clean = (field, max = 1000) => String(req.body[field] ?? '').trim().slice(0, max);
+        const clean = (field, max = 1000) => cleanText(req.body[field], max);
 
         if (canUpdate('username')) {
             const username = clean('username', 40);
@@ -1495,7 +1427,7 @@ app.put('/api/profile/update', (req, res, next) => {
                 professionTags = req.body.profession ? [req.body.profession] : []; 
             }
             professionTags = (Array.isArray(professionTags) ? professionTags : [professionTags])
-                .map(tag => String(tag || '').trim())
+                .map(tag => cleanText(tag, 60))
                 .filter(Boolean)
                 .slice(0, 20);
 
@@ -1530,14 +1462,14 @@ app.put('/api/profile/update', (req, res, next) => {
     } catch (err) {
         console.error("Update Error:", err);
         if (err?.code === 11000) return res.status(409).json({ message: "Username or email already exists" });
-        res.status(500).json({ message: "Server error: " + err.message });
+        res.status(500).json({ message: "Server error" });
     }
 });
 
 // --- PORTFOLIO: create project with up to 10 media ---
 app.post('/api/profile/portfolio', (req, res, next) => {
     upload.array('workMedia', 10)(req, res, (err) => {
-        if (err) return res.status(500).json({ message: "Upload error: " + err.message });
+        if (err) return res.status(400).json({ message: "Upload error: " + err.message });
         next();
     });
 }, async (req, res) => {
@@ -1553,7 +1485,7 @@ app.post('/api/profile/portfolio', (req, res, next) => {
             type: f.mimetype.startsWith('video') ? 'video' : 'image'
         }));
 
-        const title = (req.body.title || 'New Project').trim() || 'New Project';
+        const title = cleanText(req.body.title || 'New Project', 120) || 'New Project';
 
         let user = await Worker.findById(decoded.id);
         if (!user) user = await Employer.findById(decoded.id);
@@ -1564,7 +1496,7 @@ app.post('/api/profile/portfolio', (req, res, next) => {
 
         user.projects.push({
             title,
-            description: req.body.description || '',
+            description: cleanText(req.body.description, 1500),
             media
         });
         await user.save();
@@ -1590,11 +1522,12 @@ app.put('/api/profile/portfolio/:projectId/title', async (req,res)=>{
         const project = user.projects.id(projectId);
         if(!project) return res.status(404).json({ message:"Project not found"});
 
-        const normalized = title.trim().toLowerCase();
+        const cleanTitle = cleanText(title, 120);
+        const normalized = cleanTitle.toLowerCase();
         const duplicate = user.projects.some(p => p._id.toString() !== projectId && (p.title || '').trim().toLowerCase() === normalized);
         if(duplicate) return res.status(400).json({ message:"Project name must be unique" });
 
-        project.title = title.trim();
+        project.title = cleanTitle;
         await user.save();
 
         res.json({ projects: user.projects });
@@ -1710,20 +1643,18 @@ app.get('/api/explore/portfolio', async (req,res)=>{
 });
 
 // Delete media item
-app.delete('/api/profile/portfolio/:projectId/media/:mediaId', async (req,res)=>{
+app.delete('/api/profile/portfolio/:projectId/media/:mediaId', authMiddleware, async (req,res)=>{
     try{
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ message: "No token" });
-        const decoded = jwt.verify(token, JWT_SECRET);
         const { projectId, mediaId } = req.params;
+        if (!isValidObjectId(projectId) || !isValidObjectId(mediaId)) return res.status(400).json({ message:"Invalid project or media id" });
         let user = await Worker.findOneAndUpdate(
-            { _id: decoded.id, "projects._id": projectId },
+            { _id: req.user._id, "projects._id": projectId },
             { $pull: { "projects.$.media": { _id: mediaId } } },
             { new: true }
         );
         if(!user){
             user = await Employer.findOneAndUpdate(
-                { _id: decoded.id, "projects._id": projectId },
+                { _id: req.user._id, "projects._id": projectId },
                 { $pull: { "projects.$.media": { _id: mediaId } } },
                 { new: true }
             );
@@ -1736,25 +1667,23 @@ app.delete('/api/profile/portfolio/:projectId/media/:mediaId', async (req,res)=>
 // Replace media item
 app.put('/api/profile/portfolio/:projectId/media/:mediaId', (req,res,next)=>{
     upload.single('workMedia')(req,res,(err)=>{
-        if(err) return res.status(500).json({ message:"Upload error: "+err.message });
+        if(err) return res.status(400).json({ message:"Upload error: "+err.message });
         next();
     });
-}, async (req,res)=>{
+}, authMiddleware, async (req,res)=>{
     try{
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ message: "No token" });
-        const decoded = jwt.verify(token, JWT_SECRET);
         const { projectId, mediaId } = req.params;
+        if (!isValidObjectId(projectId) || !isValidObjectId(mediaId)) return res.status(400).json({ message:"Invalid project or media id" });
         if(!req.file) return res.status(400).json({ message:"No file uploaded" });
-        const media = { url:`/uploads/${req.file.filename}`, type:req.file.mimetype.startsWith('video')?'video':'image' };
+        const media = { url:`/uploads/${req.file.filename}`, type:'image' };
         let user = await Worker.findOneAndUpdate(
-            { _id: decoded.id, "projects._id": projectId, "projects.media._id": mediaId },
+            { _id: req.user._id, "projects._id": projectId, "projects.media._id": mediaId },
             { $set: { "projects.$[p].media.$[m].url": media.url, "projects.$[p].media.$[m].type": media.type } },
             { new:true, arrayFilters:[{ "p._id": projectId }, { "m._id": mediaId }] }
         );
         if(!user){
             user = await Employer.findOneAndUpdate(
-                { _id: decoded.id, "projects._id": projectId, "projects.media._id": mediaId },
+                { _id: req.user._id, "projects._id": projectId, "projects.media._id": mediaId },
                 { $set: { "projects.$[p].media.$[m].url": media.url, "projects.$[p].media.$[m].type": media.type } },
                 { new:true, arrayFilters:[{ "p._id": projectId }, { "m._id": mediaId }] }
             );
@@ -1767,22 +1696,20 @@ app.put('/api/profile/portfolio/:projectId/media/:mediaId', (req,res,next)=>{
 // Add media to existing project (respect max 10)
 app.post('/api/profile/portfolio/:projectId/media', (req,res,next)=>{
     upload.array('workMedia',10)(req,res,(err)=>{
-        if(err) return res.status(500).json({ message:"Upload error: "+err.message });
+        if(err) return res.status(400).json({ message:"Upload error: "+err.message });
         next();
     });
-}, async (req,res)=>{
+}, authMiddleware, async (req,res)=>{
     try{
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ message: "No token" });
-        const decoded = jwt.verify(token, JWT_SECRET);
         const { projectId } = req.params;
+        if (!isValidObjectId(projectId)) return res.status(400).json({ message:"Invalid project id" });
         if(!req.files || !req.files.length) return res.status(400).json({ message:"No files uploaded" });
 
-        const mediaToAdd = req.files.map(f=>({ url:`/uploads/${f.filename}`, type:f.mimetype.startsWith('video')?'video':'image' }));
+        const mediaToAdd = req.files.map(f=>({ url:`/uploads/${f.filename}`, type:'image' }));
 
-        let user = await Worker.findOne({ _id: decoded.id, "projects._id": projectId });
+        let user = await Worker.findOne({ _id: req.user._id, "projects._id": projectId });
         if(!user){
-            user = await Employer.findOne({ _id: decoded.id, "projects._id": projectId });
+            user = await Employer.findOne({ _id: req.user._id, "projects._id": projectId });
         }
         if(!user) return res.status(404).json({ message:"Project not found" });
 
@@ -2078,15 +2005,15 @@ app.post('/api/jobs/invites/:inviteId/complete', authMiddleware, async (req, res
     }
 });
 
-app.post('/api/jobs/create', authMiddleware, async (req, res) => {
+app.post('/api/jobs/create', inviteRateLimit, authMiddleware, async (req, res) => {
     try {
         if (req.user.role !== 'employer') {
             return res.status(403).json({ message: 'Only employers can post jobs' });
         }
-        const title = String(req.body.title || '').trim();
-        const details = String(req.body.details || '').trim();
-        const totalFee = String(req.body.totalFee || '').trim();
-        const hours = String(req.body.hours || '').trim();
+        const title = cleanText(req.body.title, 120);
+        const details = cleanText(req.body.details, 3000);
+        const totalFee = cleanText(req.body.totalFee, 60);
+        const hours = cleanText(req.body.hours, 60);
         if (!title || !details || !totalFee || !hours) {
             return res.status(400).json({ message: 'Title, details, total fee and hours are required' });
         }
@@ -2098,13 +2025,13 @@ app.post('/api/jobs/create', authMiddleware, async (req, res) => {
             employerId: req.user._id,
             title,
             details,
-            hourlyFee: String(req.body.hourlyFee || '').trim(),
+            hourlyFee: cleanText(req.body.hourlyFee, 60),
             totalFee,
             hours,
-            workDetails: String(req.body.workDetails || '').trim(),
-            tasks: String(req.body.tasks || '').trim(),
-            category: String(req.body.category || '').trim(),
-            location: String(req.body.location || '').trim()
+            workDetails: cleanText(req.body.workDetails, 1500),
+            tasks: cleanText(req.body.tasks, 1500),
+            category: cleanText(req.body.category, 80),
+            location: cleanText(req.body.location, 180)
         });
 
         await newJob.save();
@@ -2116,10 +2043,10 @@ app.post('/api/jobs/create', authMiddleware, async (req, res) => {
 });
 
 function buildJobUpdate(req) {
-    const title = String(req.body.title || '').trim();
-    const details = String(req.body.details || '').trim();
-    const totalFee = String(req.body.totalFee || '').trim();
-    const hours = String(req.body.hours || '').trim();
+    const title = cleanText(req.body.title, 120);
+    const details = cleanText(req.body.details, 3000);
+    const totalFee = cleanText(req.body.totalFee, 60);
+    const hours = cleanText(req.body.hours, 60);
     const status = String(req.body.status || 'open').trim().toLowerCase();
     if (!title || !details || !totalFee || !hours) {
         return { error: 'Title, details, total fee and hours are required' };
@@ -2134,13 +2061,13 @@ function buildJobUpdate(req) {
         data: {
             title,
             details,
-            hourlyFee: String(req.body.hourlyFee || '').trim(),
+            hourlyFee: cleanText(req.body.hourlyFee, 60),
             totalFee,
             hours,
-            workDetails: String(req.body.workDetails || '').trim(),
-            tasks: String(req.body.tasks || '').trim(),
-            category: String(req.body.category || '').trim(),
-            location: String(req.body.location || '').trim(),
+            workDetails: cleanText(req.body.workDetails, 1500),
+            tasks: cleanText(req.body.tasks, 1500),
+            category: cleanText(req.body.category, 80),
+            location: cleanText(req.body.location, 180),
             status
         }
     };
@@ -2223,6 +2150,7 @@ app.post('/api/jobs/apply/:jobId', authMiddleware, async (req, res) => {
             return res.status(403).json({ message: "Only workers can apply to jobs" });
         }
 
+        if (!isValidObjectId(req.params.jobId)) return res.status(400).json({ message: "Invalid job id" });
         const job = await Job.findOne({ _id: req.params.jobId, status: 'open' });
         if (!job) return res.status(404).json({ message: "Job not found or no longer available" });
 
@@ -2246,6 +2174,7 @@ app.delete('/api/jobs/apply/:jobId', authMiddleware, async (req, res) => {
             return res.status(403).json({ message: "Only workers can withdraw applications" });
         }
 
+        if (!isValidObjectId(req.params.jobId)) return res.status(400).json({ message: "Invalid job id" });
         await JobApplication.findOneAndUpdate(
             { workerId: req.user._id, jobId: req.params.jobId },
             { $set: { status: 'withdrawn', workerSeen: false } }
@@ -2285,6 +2214,7 @@ app.post('/api/employer/job-requests/:appId/reject', authMiddleware, async (req,
         if (req.user.role !== 'employer') {
             return res.status(403).json({ message: "Only employers can reject job requests" });
         }
+        if (!isValidObjectId(req.params.appId)) return res.status(400).json({ message: "Invalid request id" });
         const appDoc = await JobApplication.findOneAndUpdate(
             { _id: req.params.appId, employerId: req.user._id },
             { $set: { status: 'rejected', workerSeen: false } },
@@ -2304,6 +2234,7 @@ app.post('/api/employer/job-requests/:appId/accept', authMiddleware, async (req,
         if (req.user.role !== 'employer') {
             return res.status(403).json({ message: "Only employers can accept job requests" });
         }
+        if (!isValidObjectId(req.params.appId)) return res.status(400).json({ message: "Invalid request id" });
         const appDoc = await JobApplication.findOneAndUpdate(
             { _id: req.params.appId, employerId: req.user._id },
             { $set: { status: 'accepted', workerSeen: false } },
@@ -2323,12 +2254,13 @@ app.post('/api/employer/job-requests/:appId/cancel', authMiddleware, async (req,
         if (req.user.role !== 'employer') {
             return res.status(403).json({ message: "Only employers can cancel job requests" });
         }
+        if (!isValidObjectId(req.params.appId)) return res.status(400).json({ message: "Invalid request id" });
         const appDoc = await JobApplication.findOneAndUpdate(
-            { _id: req.params.appId, employerId: req.user._id },
+            { _id: req.params.appId, employerId: req.user._id, status: 'accepted' },
             { $set: { status: 'applied', workerSeen: false } },
             { new: true }
         );
-        if (!appDoc) return res.status(404).json({ message: "Request not found" });
+        if (!appDoc) return res.status(404).json({ message: "Accepted request not found" });
         res.json({ message: "Request set back to pending" });
     } catch (err) {
         console.error("Cancel request error:", err);
@@ -2342,6 +2274,7 @@ app.delete('/api/employer/job-requests/:appId', authMiddleware, async (req, res)
         if (req.user.role !== 'employer') {
             return res.status(403).json({ message: "Only employers can delete job requests" });
         }
+        if (!isValidObjectId(req.params.appId)) return res.status(400).json({ message: "Invalid request id" });
         const deleted = await JobApplication.findOneAndDelete({
             _id: req.params.appId,
             employerId: req.user._id,
@@ -2374,14 +2307,12 @@ app.get('/api/employer/accepted-invites', authMiddleware, async (req, res) => {
     }
 });
 // --- DELETE SPECIFIC CATEGORY ---
-app.delete('/api/profile/categories/:catName', async (req, res) => {
+app.delete('/api/profile/categories/:catName', authMiddleware, requireRole('worker'), async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const catToRemove = req.params.catName;
+        const catToRemove = cleanText(req.params.catName, 80);
 
         const user = await Worker.findByIdAndUpdate(
-            decoded.id,
+            req.user._id,
             { $pull: { categories: { name: catToRemove } } },
             { new: true }
         );
@@ -2392,16 +2323,16 @@ app.delete('/api/profile/categories/:catName', async (req, res) => {
     }
 });
 // --- DELETE SPECIFIC TAG FROM A CATEGORY ---
-app.delete('/api/profile/categories/:catName/tags/:tagName', async (req, res) => {
+app.delete('/api/profile/categories/:catName/tags/:tagName', authMiddleware, requireRole('worker'), async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
         const { catName, tagName } = req.params;
+        const cleanCatName = cleanText(catName, 80);
+        const cleanTagName = cleanText(tagName, 80);
 
         // Use dot notation to find the correct category and pull the specific tag
         const user = await Worker.findOneAndUpdate(
-            { _id: decoded.id, "categories.name": catName },
-            { $pull: { "categories.$.tags": tagName } },
+            { _id: req.user._id, "categories.name": cleanCatName },
+            { $pull: { "categories.$.tags": cleanTagName } },
             { new: true }
         );
 
@@ -2419,12 +2350,13 @@ app.delete('/api/profile/categories/:catName/tags/:tagName', async (req, res) =>
 // Add 'protect' or 'authMiddleware' here so req.user is populated
 // --- WORKER FILTER ROUTE ---
 // The 'req' and 'res' variables are defined right here in the function parameters
-app.get('/api/workers/filter', authMiddleware, async (req, res) => {
+app.get('/api/workers/filter', authMiddleware, requireRole('employer'), async (req, res) => {
 try {
 
 const { job } = req.query;
 
-const searchRegex = job ? new RegExp(job,'i') : /.*/;
+const searchTerm = cleanText(job, 80);
+const searchRegex = searchTerm ? new RegExp(escapeRegex(searchTerm),'i') : /.*/;
 
 let workers = await Worker.find({
 role:'worker',
@@ -2556,7 +2488,7 @@ app.get('/api/users/profile/:id', async (req, res) => {
         res.status(500).json({ message: "Server Error" });
     }
 });
-app.get("/api/worker/invites", authMiddleware, async (req,res)=>{
+app.get("/api/worker/invites", authMiddleware, requireRole('worker'), async (req,res)=>{
 
 try{
 
@@ -2598,7 +2530,7 @@ res.status(500).json({message:"Failed to load invites"});
 }
 
 });
-app.post("/api/jobs/invite/:workerId", authMiddleware, async (req,res)=>{
+app.post("/api/jobs/invite/:workerId", inviteRateLimit, authMiddleware, requireRole('employer'), async (req,res)=>{
 
 try{
 
@@ -2606,17 +2538,14 @@ const employerId = req.user._id;
 const workerId = req.params.workerId;
 
 const {jobTitle,message, jobLocation} = req.body;
-const cleanJobTitle = String(jobTitle || "Job Opportunity").trim().slice(0, 120);
-const cleanMessage = String(message || "").trim().slice(0, 1000);
+const cleanJobTitle = cleanText(jobTitle || "Job Opportunity", 120);
+const cleanMessage = cleanText(message, 1000);
 if (!mongoose.Types.ObjectId.isValid(workerId)) {
 return res.status(400).json({message:"Invalid worker"});
 }
-if (req.user.role !== 'employer') {
-return res.status(403).json({message:"Only employers can invite workers"});
-}
 
 // Normalize location; fallback to employer profile if missing/blank
-const jobLocClean = (jobLocation || "").trim();
+const jobLocClean = cleanText(jobLocation, 180);
 const finalJobLocation = jobLocClean || (req.user.location || "").trim() || "Not specified";
 
 // fetch worker's current location snapshot
@@ -2674,34 +2603,75 @@ res.status(500).json({message:"Invite failed"});
 
 });
 app.post("/api/jobs/accept/:inviteId", authMiddleware, async (req,res)=>{
-
-const invite = await JobInvite.findByIdAndUpdate(
-req.params.inviteId,
+try {
+if (req.user.role !== 'worker') return res.status(403).json({message:"Only workers can accept invites"});
+if (!isValidObjectId(req.params.inviteId)) return res.status(400).json({message:"Invalid invite"});
+const invite = await JobInvite.findOneAndUpdate(
+{ _id: req.params.inviteId, workerId: req.user._id, status: "pending" },
 {status:"accepted"},
 {new:true}
 );
-
+if (!invite) return res.status(404).json({message:"Invite not found"});
 res.json({message:"Job accepted"});
+} catch (err) {
+console.error("Accept invite error:", err.message);
+res.status(500).json({message:"Failed to accept invite"});
+}
 
 });
 app.post("/api/jobs/reject/:inviteId", authMiddleware, async (req,res)=>{
-
-await JobInvite.findByIdAndUpdate(
-req.params.inviteId,
-{status:"rejected"}
+try {
+if (req.user.role !== 'worker') return res.status(403).json({message:"Only workers can reject invites"});
+if (!isValidObjectId(req.params.inviteId)) return res.status(400).json({message:"Invalid invite"});
+const invite = await JobInvite.findOneAndUpdate(
+{ _id: req.params.inviteId, workerId: req.user._id, status: "pending" },
+{status:"rejected"},
+{new:true}
 );
-
+if (!invite) return res.status(404).json({message:"Invite not found"});
 res.json({message:"Job rejected"});
+} catch (err) {
+console.error("Reject invite error:", err.message);
+res.status(500).json({message:"Failed to reject invite"});
+}
 
 });
 app.post("/api/jobs/cancel/:inviteId", authMiddleware, async (req,res)=>{
+try {
+if (!isValidObjectId(req.params.inviteId)) return res.status(400).json({message:"Invalid invite"});
+const isEmployer = req.user.role === 'employer';
+const isWorker = req.user.role === 'worker';
+if (!isEmployer && !isWorker) return res.status(403).json({message:"Invalid account type"});
 
-await JobInvite.findByIdAndUpdate(
-req.params.inviteId,
-{status:"pending"}
-);
+const query = isEmployer
+? { _id: req.params.inviteId, employerId: req.user._id, status: "accepted" }
+: { _id: req.params.inviteId, workerId: req.user._id, status: { $in: ["accepted", "rejected"] } };
+
+const invite = await JobInvite.findOneAndUpdate(query, {status:"pending"}, {new:true});
+if (!invite) return res.status(404).json({message:"Invite not found"});
+
+if (isEmployer) {
+const employerName = req.user.companyName || req.user.username || "An employer";
+await Worker.findByIdAndUpdate(invite.workerId, {
+$push: {
+notifications: {
+type: "invite_cancelled",
+user: req.user._id,
+userModel: "Employer",
+message: `${employerName} moved the invitation back to pending.`,
+link: "/worker/home.html",
+date: new Date(),
+read: false
+}
+}
+});
+}
 
 res.json({message:"Invite cancelled"});
+} catch (err) {
+console.error("Cancel invite error:", err.message);
+res.status(500).json({message:"Failed to cancel invite"});
+}
 
 });
 app.delete("/api/jobs/invite/:workerId", authMiddleware, async (req, res) => {
@@ -2710,7 +2680,7 @@ try {
 
 const employerId = req.user._id;
 const workerId = req.params.workerId;
-const cleanJobTitle = String(req.body?.jobTitle || "Job Opportunity").trim().slice(0, 120);
+const cleanJobTitle = cleanText(req.body?.jobTitle || '', 120);
 if (req.user.role !== 'employer') {
 return res.status(403).json({message:"Only employers can cancel invites"});
 }
@@ -2858,6 +2828,8 @@ res.status(500).json({error:"Server error"});
 // --- APPLY EXTERNAL ROUTES ---
 app.use('/api/users', workerRoutes);
 app.use('/api/employer', employerRoutes);
+app.use('/api/messages/send', messageRateLimit);
+app.use('/api/messages/send-image', messageRateLimit);
 app.use('/api/messages', messageRoutes);
 
 app.use('/api', (req, res) => {

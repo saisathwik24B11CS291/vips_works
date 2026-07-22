@@ -23,13 +23,13 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
+    "google-auth-library": "^10.9.0",
     "helmet": "^7.1.0",
-    "morgan": "^1.10.0",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^6.9.11",
-    "google-auth-library": "^9.2.0",
     "mongoose": "^9.0.1",
-    "multer": "^2.0.2"
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^9.0.3"
   },
   "main": "server.js",
   "engines": {

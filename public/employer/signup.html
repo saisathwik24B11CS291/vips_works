@@ -149,15 +149,13 @@
 
         if (response.ok) {
             messageEl.style.color = '#22c55e';
-            messageEl.textContent = result.message || "OTP sent. Opening verification...";
-            sessionStorage.setItem('signupVerification', JSON.stringify({
-                signupToken: result.signupToken,
-                email: result.email,
-                maskedEmail: result.maskedEmail,
-                role: result.role || 'employer'
-            }));
+            messageEl.textContent = result.message || "Account created. Opening dashboard...";
+            if (result.token) localStorage.setItem('token', result.token);
+            localStorage.setItem('userRole', result.role || 'employer');
+            localStorage.setItem('username', result.username || signupData.username);
+            sessionStorage.removeItem('signupVerification');
             setTimeout(() => {
-                window.location.href = '../auth/signup-verify.html';
+                window.location.href = result.redirect || 'home.html';
             }, 1500);
         } else {
             messageEl.style.color = '#ef4444';

@@ -110,7 +110,8 @@
                         <div class="actions">
                             ${inv.status === 'completed'
                                 ? `<button class="btn primary" onclick="openReview('invite','${inv._id}')"><i class="fas fa-star"></i> Review</button>`
-                                : `<button class="btn primary" onclick="completeInvite('${inv._id}')"><i class="fas fa-check"></i> Complete</button>`}
+                                : `<button class="btn primary" onclick="completeInvite('${inv._id}')"><i class="fas fa-check"></i> Complete</button>
+                                   <button class="btn ghost" onclick="cancelInvite('${inv._id}')">Cancel Invitation</button>`}
                             <button class="btn ghost" onclick="openChat('${inv.workerId?._id || ''}', true)"><i class="fas fa-message"></i> Message</button>
                         </div>
                     </div>
@@ -272,6 +273,25 @@
                 }
                 loadData();
             }catch(err){ console.error(err); }
+        }
+
+        async function cancelInvite(inviteId){
+            if(!inviteId) return;
+            try{
+                const res = await fetch(`${API_BASE}/api/jobs/cancel/${inviteId}`,{
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                const data = await res.json().catch(()=>({}));
+                if(!res.ok){
+                    alert(data.message || 'Could not cancel invitation');
+                    return;
+                }
+                loadData();
+            }catch(err){
+                console.error(err);
+                alert('Could not cancel invitation');
+            }
         }
 
         function openReview(sourceType, sourceId){

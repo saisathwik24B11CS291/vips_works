@@ -7,10 +7,30 @@ const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
 
 // Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'change_me_in_env';
-const upload = multer({ dest: 'uploads/' });
+const MAX_UPLOAD_SIZE = Number.parseInt(process.env.MAX_UPLOAD_SIZE || `${5 * 1024 * 1024}`, 10);
+const allowedUploadTypes = new Map([
+    ['image/jpeg', new Set(['.jpg', '.jpeg'])],
+    ['image/png', new Set(['.png'])],
+    ['image/webp', new Set(['.webp'])]
+]);
+function cleanText(value, max = 1000) {
+    return String(value ?? '').replace(/[\u0000-\u001F\u007F]/g, '').replace(/[<>]/g, '').trim().slice(0, max);
+}
+function uploadFileFilter(req, file, cb) {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const allowedExts = allowedUploadTypes.get(file.mimetype);
+    if (!allowedExts || !allowedExts.has(ext)) return cb(new Error('Only JPG, JPEG, PNG and WEBP images are allowed'));
+    cb(null, true);
+}
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => cb(null, `message-${crypto.randomBytes(16).toString('hex')}${path.extname(file.originalname || '').toLowerCase()}`)
+});
+const upload = multer({ storage, fileFilter: uploadFileFilter, limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 } });
 
 // --- MOVED MIDDLEWARE TO TOP TO FIX INITIALIZATION ERROR ---
 const authMiddleware = async (req, res, next) => {
@@ -66,12 +86,12 @@ router.get('/conversations', authMiddleware, async (req, res) => {
 
 // --- 2. SEARCH MESSAGES ---
 router.get('/search', authMiddleware, async (req, res) => {
-    const { q } = req.query; // The search term from URL
+        const q = cleanText(req.query.q, 80); // The search term from URL
     try {
         const messages = await Message.find({
             $and: [
                 { $or: [{ sender: req.user.id }, { receiver: req.user.id }] },
-                { text: { $regex: q || "", $options: 'i' } } // 'i' makes it case-insensitive
+                { text: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') || "", $options: 'i' } } // 'i' makes it case-insensitive
             ]
         }).limit(20);
         res.json(messages);
@@ -111,6 +131,11 @@ router.post('/send', authMiddleware, async (req, res) => {
         const { receiverId, receiverModel, text } = req.body;
         const senderId = req.user.id;
         const senderRole = req.user.role;
+        const cleanMessage = cleanText(text, 2000);
+
+        if (!mongoose.Types.ObjectId.isValid(receiverId)) return res.status(400).json({ message: "Invalid receiver" });
+        if (!['Worker', 'Employer'].includes(receiverModel)) return res.status(400).json({ message: "Invalid receiver type" });
+        if (!cleanMessage) return res.status(400).json({ message: "Message cannot be empty" });
 
         const Model = receiverModel === 'Employer' ? Employer : Worker;
         const receiver = await Model.findById(receiverId);
@@ -129,7 +154,7 @@ router.post('/send', authMiddleware, async (req, res) => {
             senderModel: senderRole === 'employer' ? 'Employer' : 'Worker',
             receiver: receiverId,
             receiverModel: receiverModel,
-            text: text,
+            text: cleanMessage,
             isRead: false
         });
 
@@ -146,6 +171,9 @@ router.post('/send', authMiddleware, async (req, res) => {
 router.post('/send-image', authMiddleware, upload.single('messageImage'), async (req, res) => {
     try {
         const payload = JSON.parse(req.body.data);
+        if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+        if (!mongoose.Types.ObjectId.isValid(payload.receiverId)) return res.status(400).json({ message: "Invalid receiver" });
+        if (!['Worker', 'Employer'].includes(payload.receiverModel)) return res.status(400).json({ message: "Invalid receiver type" });
 
         const newMessage = new Message({
             sender: req.user.id,
@@ -158,7 +186,7 @@ router.post('/send-image', authMiddleware, upload.single('messageImage'), async 
         await newMessage.save();
         res.status(201).json(newMessage);
     } catch (err) {
-        res.status(500).json({ error: "Image upload failed" });
+        res.status(400).json({ error: err.message || "Image upload failed" });
     }
 });
 

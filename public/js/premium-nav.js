@@ -265,6 +265,33 @@
     }
   }
 
+  function loginForPath(pathname) {
+    return pathname.includes("/employer/") ? PATHS.employerLogin : PATHS.workerLogin;
+  }
+
+  function requiredRoleForPath(pathname) {
+    if (pathname.includes("/employer/")) return "employer";
+    if (pathname.includes("/worker/")) return "worker";
+    return null;
+  }
+
+  function isPublicRolePage(pathname) {
+    return /\/(login|signup)\.html$/i.test(pathname);
+  }
+
+  function enforceRouteAccess(user) {
+    const pathname = window.location.pathname;
+    const requiredRole = requiredRoleForPath(pathname);
+    if (!requiredRole || isPublicRolePage(pathname)) return;
+    if (!user) {
+      window.location.replace(loginForPath(pathname));
+      return;
+    }
+    if (user.role !== requiredRole) {
+      window.location.replace(destinationFor(user.role));
+    }
+  }
+
   function setDrawer(open) {
     state.drawerOpen = open;
     const toggle = document.querySelector(".vips-mobile-toggle");
@@ -322,7 +349,8 @@
 
   async function init() {
     render();
-    await hydrateAuth();
+    const user = await hydrateAuth();
+    enforceRouteAccess(user);
     render();
   }
 

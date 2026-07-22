@@ -5,13 +5,25 @@ const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const auth = require('./middleware/auth');
 
+function cleanText(value, max = 1000) {
+    return String(value ?? '').replace(/[\u0000-\u001F\u007F]/g, '').replace(/[<>]/g, '').trim().slice(0, max);
+}
+
+function escapeRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isValidObjectId(id) {
+    return /^[a-f\d]{24}$/i.test(String(id || ''));
+}
+
 // --- 1. SEARCH LOGIC ---
 router.get('/search', auth, async (req, res) => {
     try {
-        const query = req.query.q;
+        const query = cleanText(req.query.q, 80);
         if (!query) return res.json([]);
 
-        const regex = new RegExp(query, 'i');
+        const regex = new RegExp(escapeRegex(query), 'i');
         const searcherRole = req.user.role; // Verify this is 'employer' or 'worker'
 
         console.log(`Search triggered by: ${req.user.id} with role: ${searcherRole}`);
@@ -21,7 +33,7 @@ router.get('/search', auth, async (req, res) => {
         // ALWAYS search for Workers (Both Workers and Employers need to find them)
         const workers = await Worker.find({
             $or: [{ username: regex }, { profession: regex }]
-        }).lean();
+        }).select('-password -resetCode -resetCodeExpires').lean();
         
         results = workers.map(w => ({ ...w, role: 'worker' }));
 
@@ -30,7 +42,7 @@ router.get('/search', auth, async (req, res) => {
             console.log("Searcher is a worker - adding employers to results");
             const employers = await Employer.find({ 
                 $or: [{ username: regex }, { companyName: regex }] 
-            }).lean();
+            }).select('-password -resetCode -resetCodeExpires').lean();
 
             const employerResults = employers.map(e => ({ ...e, role: 'employer' }));
             results = [...results, ...employerResults];
@@ -52,11 +64,12 @@ router.get('/profile/:id', auth, async (req, res) => {
     try {
 
         // First check Worker collection
-        let worker = await Worker.findById(req.params.id).lean();
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid user id" });
+        let worker = await Worker.findById(req.params.id).select('-password -resetCode -resetCodeExpires').lean();
 
         // If not found, check User collection
         if (!worker) {
-            worker = await User.findById(req.params.id).lean();
+            worker = await User.findById(req.params.id).select('-password -resetCode -resetCodeExpires').lean();
         }
 
         if (!worker) {
@@ -77,10 +90,12 @@ router.post('/follow/:id', auth, async (req, res) => {
     try {
         const targetId = req.params.id;
         const myId = req.user.id;
+        if (!isValidObjectId(targetId)) return res.status(400).json({ message: "Invalid user id" });
 
         // ... existing validation ...
 
         const targetUser = await User.findById(targetId);
+        if (!targetUser) return res.status(404).json({ message: "User not found" });
         const useAutoAccept = targetUser.settings?.autoAccept === true;
 
         if (useAutoAccept) {
@@ -107,6 +122,7 @@ router.post('/follow/:id', auth, async (req, res) => {
 // --- 4. UNFOLLOW / CANCEL REQUEST ---
 router.post('/unfollow/:id', auth, async (req, res) => {
     try {
+        if (!isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid user id" });
         await User.findByIdAndUpdate(req.params.id, {
             $pull: { followers: req.user.id, followRequests: req.user.id }
         });
@@ -122,6 +138,8 @@ router.post('/accept-request/:workerId', auth, async (req, res) => {
     try {
         const employerId = req.user.id;
         const workerId = req.params.workerId;
+        if (req.user.role !== 'employer') return res.status(403).json({ message: "Employer account required" });
+        if (!isValidObjectId(workerId)) return res.status(400).json({ message: "Invalid worker id" });
 
         await User.findByIdAndUpdate(employerId, {
             $pull: { followRequests: workerId },
@@ -137,6 +155,8 @@ router.post('/accept-request/:workerId', auth, async (req, res) => {
 
 router.post('/reject-request/:workerId', auth, async (req, res) => {
     try {
+        if (req.user.role !== 'employer') return res.status(403).json({ message: "Employer account required" });
+        if (!isValidObjectId(req.params.workerId)) return res.status(400).json({ message: "Invalid worker id" });
         await User.findByIdAndUpdate(req.user.id, { $pull: { followRequests: req.params.workerId } });
         res.json({ message: "Request rejected." });
     } catch (err) {
@@ -148,7 +168,10 @@ router.post('/reject-request/:workerId', auth, async (req, res) => {
 router.put('/update-settings', auth, async (req, res) => {
     try {
         const userId = req.user.id;
-        const { settings } = req.body;
+        const settings = {
+            autoAccept: req.body?.settings?.autoAccept === true,
+            followToView: req.body?.settings?.followToView === true
+        };
 
         const updatedUser = await User.findByIdAndUpdate(
             userId, 
