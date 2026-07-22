@@ -142,7 +142,7 @@
 </div>
 
 <script>
-    const API = "http://127.0.0.1:5000"; 
+    const API = window.location.origin; 
     let selectedFile = null;
     let selectedSkills = new Set();
     let isInitialLoad = true; // Guard to prevent resetting skills on first load
@@ -248,15 +248,25 @@
     async function updateProfile() {
         const btn = document.getElementById('save-btn');
         const status = document.getElementById('status');
+        const name = document.getElementById('name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        if(!name || name.length < 3){
+            status.innerText = "Username must be at least 3 characters.";
+            return;
+        }
+        if(phone && !/^[0-9+\-() ]{7,24}$/.test(phone)){
+            status.innerText = "Enter a valid phone number.";
+            return;
+        }
         btn.disabled = true;
         status.innerText = "Syncing with cloud...";
 
         const fd = new FormData();
         const cat = document.getElementById('category').value;
-        fd.append('username', document.getElementById('name').value);
-        fd.append('companyName', document.getElementById('name').value);
-        fd.append('location', document.getElementById('location').value);
-        fd.append('phone', document.getElementById('phone').value);
+        fd.append('username', name);
+        fd.append('companyName', name);
+        fd.append('location', document.getElementById('location').value.trim());
+        fd.append('phone', phone);
         fd.append('mainCategory', cat);
         fd.append('category', cat);
         fd.append('profession', JSON.stringify(Array.from(selectedSkills)));
@@ -269,10 +279,12 @@
             });
 
             if (res.ok) {
-                status.innerHTML = " Profile Transformed Successfully!";
-                setTimeout(() => window.location.href = "profile.html", 800);
+                await init();
+                status.innerHTML = "Profile updated successfully.";
+                setTimeout(() => window.location.href = "profile.html", 600);
             } else {
-                status.innerHTML = " Transformation Failed.";
+                const data = await res.json().catch(()=>({}));
+                status.innerHTML = data.message || "Update failed.";
                 btn.disabled = false;
             }
         } catch (err) {

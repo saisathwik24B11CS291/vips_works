@@ -135,6 +135,18 @@ font-weight:bold;
 margin-top:20px;
 cursor:pointer
 }
+.accept-btn{
+width:100%;
+padding:15px;
+background:#00f076;
+color:#001b0b;
+border:none;
+border-radius:12px;
+font-weight:bold;
+margin-top:12px;
+cursor:pointer
+}
+.accept-btn:disabled{background:#244532;color:#9ca3af;cursor:default}
 .rating-line{color:#fbbf24;font-weight:700;margin:4px 0 0}
 .timeline-item{border-left:2px solid #30363d;padding:0 0 12px 12px;margin-left:4px;color:#c9d1d9;font-size:13px}
 .review-card{background:#10151d;border:1px solid #263241;border-radius:12px;padding:12px;margin-top:10px;font-size:13px;color:#c9d1d9}
@@ -292,6 +304,15 @@ ${professionText}
 
 <div class="info-item">
 <div class="info-label">
+<i class="fas fa-briefcase"></i> CATEGORY
+</div>
+<div class="info-value">
+<strong>${worker.mainCategory || "Not specified"}</strong>
+</div>
+</div>
+
+<div class="info-item">
+<div class="info-label">
 <i class="fas fa-envelope"></i> EMAIL
 </div>
 <div class="info-value">
@@ -309,6 +330,11 @@ CURRENT LOCATION
 </div>
 </div>
 
+</div>
+
+<div class="skills-container">
+<div class="info-label">ABOUT</div>
+<p style="color:#c9d1d9;line-height:1.5;margin:10px 0 0;">${worker.bio || "No bio added yet."}</p>
 </div>
 
 <div class="skills-container">
@@ -376,6 +402,13 @@ Message ${worker.username}
 
 </button>
 
+${worker.canAcceptRequest ? `
+<button id="accept-request-btn" class="accept-btn" onclick="acceptWorkerRequest('${worker._id}')">
+<i class="fas fa-check"></i>
+Accept Request
+</button>
+` : ""}
+
 </div>
 `;
 
@@ -385,6 +418,27 @@ console.error("Fetch Error:",err);
 
 }
 
+}
+
+async function acceptWorkerRequest(workerId){
+const btn=document.getElementById("accept-request-btn");
+if(!btn)return;
+btn.disabled=true;
+btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Accepting...';
+try{
+const res=await fetch(`${API_BASE}/api/users/confirm/${workerId}`,{
+method:"POST",
+headers:{Authorization:`Bearer ${localStorage.getItem("token")}`}
+});
+const data=await res.json().catch(()=>({}));
+if(!res.ok)throw new Error(data.message||"Could not accept request");
+btn.innerHTML='<i class="fas fa-check"></i> Accepted';
+setTimeout(loadWorkerProfile,300);
+}catch(err){
+btn.disabled=false;
+btn.innerHTML='<i class="fas fa-check"></i> Accept Request';
+alert(err.message||"Could not accept request");
+}
 }
 
 async function loadReviews(workerId){

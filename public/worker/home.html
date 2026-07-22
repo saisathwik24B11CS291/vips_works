@@ -129,6 +129,15 @@ border-radius:999px;
   align-items:center;
   gap:10px;
 }
+.global-search-wrap{position:relative;margin:8px 0 14px;}
+.global-search-results{
+  position:absolute;top:48px;left:0;right:0;background:#0f1620;border:1px solid var(--border);
+  border-radius:12px;box-shadow:var(--shadow);z-index:1200;display:none;max-height:280px;overflow-y:auto;
+}
+.global-result{display:flex;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid #18202c;cursor:pointer;}
+.global-result:hover{background:#162033;}
+.global-result:last-child{border-bottom:none;}
+.global-tag{font-size:11px;color:#9ca3af;background:#111827;border:1px solid #243044;border-radius:8px;padding:2px 6px;white-space:nowrap;}
 .mini-btn{
   background:var(--panel-2);
   border:1px solid var(--border);
@@ -386,6 +395,14 @@ z-index:3000;
 
 <h2>Jobs For You</h2>
 
+<div class="global-search-wrap">
+  <div class="search-container" style="margin:0;">
+    <i class="fas fa-search"></i>
+    <input type="text" id="global-search-input" placeholder="Search jobs, services, posts, businesses, workers..." oninput="setGlobalSearch()" />
+  </div>
+  <div id="global-search-results" class="global-search-results"></div>
+</div>
+
 <div class="jobs-toolbar">
   <div class="pill-tabs">
     <button id="tab-invited" class="tab-btn active" onclick="showInvited()">Invited</button>
@@ -497,6 +514,7 @@ let postedSearchTerm="";
 let inviteFilterStatus="pending"; // pending | accepted | rejected | all
 let postedFilterStatus="all"; // applied | notapplied | all
 let openMenu=null;
+let globalSearchTimer=null;
 // job updates badge
 async function checkJobUpdates(){
     try{
@@ -985,6 +1003,53 @@ function undoInvite(id){
     }).then(() => loadJobInvites()).catch(()=>{});
 }
 
+function setGlobalSearch(){
+    clearTimeout(globalSearchTimer);
+    globalSearchTimer=setTimeout(runGlobalSearch,150);
+}
+
+async function runGlobalSearch(){
+    const input=document.getElementById('global-search-input');
+    const box=document.getElementById('global-search-results');
+    const q=(input.value||"").trim();
+    if(!q){box.style.display='none';box.innerHTML='';return;}
+    box.style.display='block';
+    box.innerHTML='<div class="global-result"><span>Searching...</span><span class="global-tag">Live</span></div>';
+    try{
+        const res=await fetch(`${API_BASE}/api/search/global?q=${encodeURIComponent(q)}`,{
+            headers:{'Authorization':`Bearer ${token}`}
+        });
+        const results=res.ok ? await res.json() : [];
+        if(!results.length){
+            box.innerHTML='<div class="global-result"><span>No Results Found</span><span class="global-tag">0</span></div>';
+            return;
+        }
+        box.innerHTML=results.slice(0,10).map(item=>`
+            <div class="global-result" onclick="openGlobalResult('${encodeURIComponent(item.url || '')}')">
+                <span>${item.title || 'Result'}</span>
+                <span class="global-tag">${labelGlobalType(item.type)}</span>
+            </div>
+        `).join('');
+    }catch(err){
+        box.innerHTML='<div class="global-result"><span>No Results Found</span><span class="global-tag">Error</span></div>';
+    }
+}
+
+function labelGlobalType(type){
+    return ({job:"Job",service:"Service",post:"Post",worker:"Worker",employer:"Employer"}[type] || "Result");
+}
+
+function openGlobalResult(encodedUrl){
+    const url=decodeURIComponent(encodedUrl||"");
+    if(url) window.location.href=url;
+}
+
+document.addEventListener('click',(e)=>{
+    const input=document.getElementById('global-search-input');
+    const box=document.getElementById('global-search-results');
+    if(box && input && !box.contains(e.target) && e.target!==input) box.style.display='none';
+});
+
 async function reviewInvite(id){
     const rating = Number(prompt("Rate this employer from 1 to 5", "5"));
     if(!Number.isInteger(rating) || rating < 1 || rating > 5){
@@ -1028,19 +1093,39 @@ const btn=document.getElementById('detect-btn-el');
 btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Detecting...';
 btn.disabled=true;
 
+if(!navigator.geolocation){
+alert("Geolocation is not supported by your browser. Please select a city manually.");
+resetDetectButton();
+return;
+}
+
 navigator.geolocation.getCurrentPosition(async(pos)=>{
 
 const {latitude,longitude}=pos.coords;
 
+try{
 const res=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
 const data=await res.json();
 
 const city=data.city||data.locality||"Unknown";
 
-confirmLocation(city);
+await confirmLocation(city);
+}catch(err){
+alert("Could not detect your city. Please select it manually.");
+resetDetectButton();
+}
 
-});
+},()=>{
+alert("Location permission was denied or unavailable. Please select a city manually.");
+resetDetectButton();
+},{timeout:10000});
 
+}
+
+function resetDetectButton(){
+const btn=document.getElementById('detect-btn-el');
+btn.innerHTML='<i class="fas fa-crosshairs"></i> Detect My Location';
+btn.disabled=false;
 }
 
 async function confirmLocation(cityName){
@@ -1061,6 +1146,11 @@ document.getElementById('home-location-text').innerText=cityName;
 localStorage.setItem("userLocation", cityName);
 
 toggleLocationPopup(false);
+resetDetectButton();
+}else{
+const data=await res.json().catch(()=>({}));
+alert(data.message||"Could not save location");
+resetDetectButton();
 }
 
 }

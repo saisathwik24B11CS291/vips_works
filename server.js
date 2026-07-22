@@ -191,7 +191,7 @@ app.use((req,res,next)=>{
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','no-referrer');
     res.setHeader('X-Frame-Options','SAMEORIGIN');
-    res.setHeader('Permissions-Policy','geolocation=(), microphone=(), camera=()');
+    res.setHeader('Permissions-Policy','geolocation=(self), microphone=(), camera=()');
     next();
 });
 // helmet with relaxed CSP (to avoid breaking inline scripts)
@@ -1121,14 +1121,115 @@ app.post('/api/settings/language', authMiddleware, async (req, res) => {
 });
 // --- SEARCH & PROFILE ---
 app.get('/api/users/search', async (req, res) => {
-    const query = req.query.q || ""; 
+    const query = String(req.query.q || "").trim();
     try {
-        const workers = await Worker.find({ username: { $regex: query, $options: 'i' } })
-            .select('username profilePicture role followers mainCategory settings'); // Added mainCategory & settings
-        const employers = await Employer.find({ username: { $regex: query, $options: 'i' } })
-            .select('username profilePicture role followers mainCategory settings companyName'); // Added companyName
+        const regex = new RegExp(escapeRegex(query), 'i');
+        const filter = query ? { username: regex } : {};
+        const workers = await Worker.find(filter)
+            .select('username profilePicture role followers followRequests mainCategory profession location settings')
+            .limit(20);
+        const employers = await Employer.find(filter)
+            .select('username profilePicture role followers followRequests mainCategory settings companyName location')
+            .limit(20);
         res.json([...workers, ...employers]);
     } catch (err) { res.status(500).json({ message: "Search failed" }); }
+});
+
+app.get('/api/search/global', async (req, res) => {
+    try {
+        const query = String(req.query.q || '').trim();
+        if (!query) return res.json([]);
+        const regex = new RegExp(escapeRegex(query), 'i');
+        let viewerRole = '';
+        try {
+            const token = req.headers.authorization?.split(' ')[1];
+            if (token) viewerRole = jwt.verify(token, JWT_SECRET).role || '';
+        } catch (e) {}
+        const [jobs, workers, employers, portfolioWorkers, portfolioEmployers] = await Promise.all([
+            Job.find({
+                status: 'open',
+                $or: [
+                    { title: regex },
+                    { details: regex },
+                    { category: regex },
+                    { location: regex },
+                    { tasks: regex }
+                ]
+            }).select('title category location createdAt employerId').populate('employerId', 'username companyName').sort({ createdAt: -1 }).limit(8).lean(),
+            Worker.find({
+                $or: [
+                    { username: regex },
+                    { mainCategory: regex },
+                    { profession: regex },
+                    { 'categories.name': regex },
+                    { 'categories.tags': regex },
+                    { location: regex }
+                ]
+            }).select('username profilePicture role mainCategory profession location').limit(8).lean(),
+            Employer.find({
+                $or: [
+                    { username: regex },
+                    { companyName: regex },
+                    { mainCategory: regex },
+                    { location: regex }
+                ]
+            }).select('username companyName profilePicture role mainCategory location').limit(8).lean(),
+            Worker.find({ 'projects.title': regex }).select('username role profilePicture projects').limit(6).lean(),
+            Employer.find({ 'projects.title': regex }).select('username companyName role profilePicture projects').limit(6).lean()
+        ]);
+
+        const serviceNames = ['General Labour', 'Loading', 'Cleaning', 'Construction', 'Helper', 'Delivery', 'Food & Restaurant', 'Grocery Delivery', 'Medical & Pharmaceutical', 'Long-Distance Trucking', 'Skilled Workers', 'Electrician', 'Plumber', 'Carpenter', 'Welder'];
+        const services = serviceNames
+            .filter(name => regex.test(name))
+            .slice(0, 8)
+            .map(name => ({ type: 'service', id: name, title: name, subtitle: 'Service category', url: viewerRole === 'employer' ? `/employer/worker-list.html?job=${encodeURIComponent(name)}` : `/worker/home.html?service=${encodeURIComponent(name)}` }));
+
+        const projectResults = [...portfolioWorkers, ...portfolioEmployers].flatMap(user =>
+            (user.projects || [])
+                .filter(project => regex.test(project.title || '') || regex.test(project.description || ''))
+                .slice(0, 2)
+                .map(project => ({
+                    type: 'post',
+                    id: project._id,
+                    title: project.title || 'Portfolio post',
+                    subtitle: user.companyName || user.username || 'Profile showcase',
+                    url: user.role === 'employer' ? `/employer/profile.html?id=${user._id}&project=${project._id}` : `/worker/profile.html?id=${user._id}&project=${project._id}`
+                }))
+        ).slice(0, 8);
+
+        const results = [
+            ...jobs.map(job => ({
+                type: 'job',
+                id: job._id,
+                title: job.title,
+                subtitle: `${job.category || 'Job'}${job.location ? ` - ${job.location}` : ''}`,
+                url: `/worker/home.html?job=${job._id}`
+            })),
+            ...services,
+            ...projectResults,
+            ...workers.map(worker => ({
+                type: 'worker',
+                id: worker._id,
+                title: worker.username,
+                subtitle: worker.mainCategory || (worker.profession || []).join(', ') || 'Worker',
+                image: worker.profilePicture || '',
+                url: viewerRole === 'employer' ? `/employer/view-worker.html?id=${worker._id}` : `/worker/profile.html?id=${worker._id}`
+            })),
+            ...employers.map(employer => ({
+                type: 'employer',
+                id: employer._id,
+                title: employer.companyName || employer.username,
+                subtitle: employer.mainCategory || 'Employer',
+                image: employer.profilePicture || '',
+                url: viewerRole === 'employer' ? `/employer/profile.html?id=${employer._id}` : `/friendprofile.html?id=${employer._id}`
+            }))
+        ];
+
+        res.json(results.slice(0, 30));
+    } catch (err) {
+        console.error('Global search failed:', err);
+        res.status(500).json({ message: 'Search failed' });
+    }
 });
 
 // --- SOCIAL / FOLLOW SYSTEM (PUBLIC) ---
@@ -1275,28 +1376,55 @@ app.put('/api/profile/update', (req, res, next) => {
         if (!token) return res.status(401).json({ message: "No token provided" });
         
         const decoded = jwt.verify(token, JWT_SECRET);
-        
-        // 2. Prepare the update object
+        const currentUser = await findUserById(decoded.id, decoded.role);
+        if (!currentUser) return res.status(404).json({ message: "User not found" });
+
         const updateData = {};
-        
-        // Update basic fields if they exist in req.body
-        if (req.body.username) updateData.username = req.body.username;
-        if (req.body.location) updateData.location = req.body.location; // Handles your Home Page update
-        if (req.body.phone) updateData.phone = req.body.phone;
-        if (req.body.bio) updateData.bio = req.body.bio;
-        if (req.body.companyName) updateData.companyName = req.body.companyName;
-        if (req.body.category) updateData.category = req.body.category;
-        if (req.body.mainCategory) updateData.mainCategory = req.body.mainCategory;
+        const canUpdate = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
+        const clean = (field, max = 1000) => String(req.body[field] ?? '').trim().slice(0, max);
+
+        if (canUpdate('username')) {
+            const username = clean('username', 40);
+            if (!username) return res.status(400).json({ message: "Username is required" });
+            if (!/^[a-zA-Z0-9_. -]{3,40}$/.test(username)) {
+                return res.status(400).json({ message: "Username must be 3-40 characters and use letters, numbers, spaces, dots, underscores or hyphens" });
+            }
+            const exactCaseInsensitive = new RegExp(`^${escapeRegex(username)}$`, 'i');
+            const [workerMatch, employerMatch] = await Promise.all([
+                Worker.findOne({ username: exactCaseInsensitive }).select('_id'),
+                Employer.findOne({ username: exactCaseInsensitive }).select('_id')
+            ]);
+            const duplicate = [workerMatch, employerMatch].some(match => match && match._id.toString() !== decoded.id.toString());
+            if (duplicate) return res.status(409).json({ message: "Change username. It is already used by someone." });
+            updateData.username = username;
+            if (currentUser.role === 'employer' && !canUpdate('companyName')) updateData.companyName = username;
+        }
+        if (canUpdate('location')) updateData.location = clean('location', 180);
+        if (canUpdate('phone')) {
+            const phone = clean('phone', 24);
+            if (phone && !/^[0-9+\-() ]{7,24}$/.test(phone)) {
+                return res.status(400).json({ message: "Enter a valid phone number" });
+            }
+            updateData.phone = phone;
+        }
+        if (canUpdate('bio')) updateData.bio = clean('bio', 1000);
+        if (canUpdate('companyName')) updateData.companyName = clean('companyName', 80);
+        if (canUpdate('category')) updateData.category = clean('category', 80);
+        if (canUpdate('mainCategory')) updateData.mainCategory = clean('mainCategory', 80);
         if (req.file) updateData.profilePicture = `/uploads/${req.file.filename}`;
 
         // 3. Handle Profession Tags & Multi-Category Logic for Workers
-        if (req.body.profession || req.body.mainCategory) {
+        if (canUpdate('profession') || canUpdate('mainCategory')) {
             let professionTags = [];
             try {
                 professionTags = JSON.parse(req.body.profession || "[]");
             } catch (e) { 
                 professionTags = req.body.profession ? [req.body.profession] : []; 
             }
+            professionTags = (Array.isArray(professionTags) ? professionTags : [professionTags])
+                .map(tag => String(tag || '').trim())
+                .filter(Boolean)
+                .slice(0, 20);
 
             let user = await Worker.findById(decoded.id);
             if (user) {
@@ -1314,12 +1442,8 @@ app.put('/api/profile/update', (req, res, next) => {
             }
         }
 
-        // 4. Execute the update on whichever collection the user belongs to
-        let updatedUser = await Worker.findByIdAndUpdate(decoded.id, { $set: updateData }, { new: true });
-        
-        if (!updatedUser) {
-            updatedUser = await Employer.findByIdAndUpdate(decoded.id, { $set: updateData }, { new: true });
-        }
+        const Model = currentUser.role === 'employer' ? Employer : Worker;
+        let updatedUser = await Model.findByIdAndUpdate(decoded.id, { $set: updateData }, { new: true }).select('-password');
 
         if (!updatedUser) return res.status(404).json({ message: "User not found" });
 
@@ -1332,6 +1456,7 @@ app.put('/api/profile/update', (req, res, next) => {
 
     } catch (err) {
         console.error("Update Error:", err);
+        if (err?.code === 11000) return res.status(409).json({ message: "Username or email already exists" });
         res.status(500).json({ message: "Server error: " + err.message });
     }
 });
@@ -1637,14 +1762,28 @@ app.get('/api/users/requests', async (req, res) => {
 // --- CONFIRM/ACCEPT REQUEST (The "Hire" Logic) ---
 app.post('/api/users/confirm/:requesterId', authMiddleware, async (req, res) => {
     try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: "Only employers can accept worker requests" });
+        }
         const myId = req.user._id; // The Employer
         const requesterId = req.params.requesterId; // The Worker
+        if (!mongoose.Types.ObjectId.isValid(requesterId)) {
+            return res.status(400).json({ message: "Invalid worker" });
+        }
+
+        const worker = await Worker.findById(requesterId).select('username profilePicture role location phone email profession mainCategory categories ratingAverage ratingCount completedJobs experienceLevel');
+        if (!worker) return res.status(404).json({ message: "Worker not found" });
 
         // 1. Update Employer: Remove from requests, add to followers (Total Hired)
-        await Employer.findByIdAndUpdate(myId, {
-            $pull: { followRequests: requesterId },
+        const employer = await Employer.findOneAndUpdate({
+            _id: myId,
+            followRequests: requesterId
+        }, {
+            $pull: { followRequests: requesterId, notifications: { user: requesterId, type: 'request' } },
             $addToSet: { followers: requesterId } 
-        });
+        }, { new: true }).select('followers followRequests');
+
+        if (!employer) return res.status(404).json({ message: "Request not found" });
 
         // 2. Update Worker: Add Employer to their 'following' list
         await Worker.findByIdAndUpdate(requesterId, {
@@ -1663,7 +1802,7 @@ app.post('/api/users/confirm/:requesterId', authMiddleware, async (req, res) => 
             }
         });
 
-        res.json({ message: "Request accepted and Worker added to Hired list" });
+        res.json({ message: "Request accepted and Worker added to Hired list", worker, followers: employer.followers, followRequests: employer.followRequests });
     } catch (err) {
         console.error("Confirm Error:", err);
         res.status(500).json({ message: "Error confirming request" });
@@ -1878,6 +2017,95 @@ app.post('/api/jobs/create', authMiddleware, async (req, res) => {
         res.status(500).json({ error: "Failed to create job" });
     }
 });
+
+function buildJobUpdate(req) {
+    const title = String(req.body.title || '').trim();
+    const details = String(req.body.details || '').trim();
+    const totalFee = String(req.body.totalFee || '').trim();
+    const hours = String(req.body.hours || '').trim();
+    const status = String(req.body.status || 'open').trim().toLowerCase();
+    if (!title || !details || !totalFee || !hours) {
+        return { error: 'Title, details, total fee and hours are required' };
+    }
+    if (title.length > 120 || details.length > 3000) {
+        return { error: 'Job details are too long' };
+    }
+    if (!['open', 'closed'].includes(status)) {
+        return { error: 'Status must be open or closed' };
+    }
+    return {
+        data: {
+            title,
+            details,
+            hourlyFee: String(req.body.hourlyFee || '').trim(),
+            totalFee,
+            hours,
+            workDetails: String(req.body.workDetails || '').trim(),
+            tasks: String(req.body.tasks || '').trim(),
+            category: String(req.body.category || '').trim(),
+            location: String(req.body.location || '').trim(),
+            status
+        }
+    };
+}
+
+app.get('/api/jobs/detail/:jobId', async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
+            return res.status(400).json({ message: 'Invalid job id' });
+        }
+        const job = await Job.findOne({ _id: req.params.jobId, status: 'open' })
+            .populate('employerId', 'companyName username profilePicture location');
+        if (!job) return res.status(404).json({ message: 'Job not found or no longer available' });
+        res.json(job);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to load job' });
+    }
+});
+
+app.put('/api/jobs/:jobId', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can edit jobs' });
+        }
+        if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
+            return res.status(400).json({ message: 'Invalid job id' });
+        }
+        const built = buildJobUpdate(req);
+        if (built.error) return res.status(400).json({ message: built.error });
+        const job = await Job.findOneAndUpdate(
+            { _id: req.params.jobId, employerId: req.user._id },
+            { $set: built.data },
+            { new: true }
+        );
+        if (!job) return res.status(404).json({ message: 'Job not found or you do not own it' });
+        res.json({ message: 'Job updated successfully', job });
+    } catch (err) {
+        console.error('Update job failed:', err);
+        res.status(500).json({ message: 'Failed to update job' });
+    }
+});
+
+app.delete('/api/jobs/:jobId', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'employer') {
+            return res.status(403).json({ message: 'Only employers can delete jobs' });
+        }
+        if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
+            return res.status(400).json({ message: 'Invalid job id' });
+        }
+        const deleted = await Job.findOneAndDelete({ _id: req.params.jobId, employerId: req.user._id });
+        if (!deleted) return res.status(404).json({ message: 'Job not found or you do not own it' });
+        await JobApplication.updateMany(
+            { jobId: deleted._id, status: { $nin: ['completed'] } },
+            { $set: { status: 'withdrawn', workerSeen: false } }
+        );
+        res.json({ message: 'Job deleted successfully', jobId: deleted._id });
+    } catch (err) {
+        console.error('Delete job failed:', err);
+        res.status(500).json({ message: 'Failed to delete job' });
+    }
+});
 // Get all open jobs for workers
 app.get('/api/jobs/feed', async (req, res) => {
     try {
@@ -1898,8 +2126,8 @@ app.post('/api/jobs/apply/:jobId', authMiddleware, async (req, res) => {
             return res.status(403).json({ message: "Only workers can apply to jobs" });
         }
 
-        const job = await Job.findById(req.params.jobId);
-        if (!job) return res.status(404).json({ message: "Job not found" });
+        const job = await Job.findOne({ _id: req.params.jobId, status: 'open' });
+        if (!job) return res.status(404).json({ message: "Job not found or no longer available" });
 
         const application = await JobApplication.findOneAndUpdate(
             { workerId: req.user._id, jobId: job._id },
@@ -2173,6 +2401,11 @@ app.get('/api/users/profile/:id', async (req, res) => {
         // 3. Calculate status for UI
         const isFollowing = foundUser.followers?.some(id => id.toString() === myIdStr) || false;
         const hasRequested = foundUser.followRequests?.some(id => id.toString() === myIdStr) || false;
+        let canAcceptRequest = false;
+        if (myIdStr && foundUser.role === 'worker') {
+            const viewerEmployer = await Employer.findById(myIdStr).select('followRequests followers');
+            canAcceptRequest = !!viewerEmployer?.followRequests?.some(id => id.toString() === targetId.toString());
+        }
 
         // 4. Build the object
         const profileData = {
@@ -2192,6 +2425,7 @@ app.get('/api/users/profile/:id', async (req, res) => {
     followers: foundUser.followers || [],
     isFollowing: isFollowing,
     hasRequested: hasRequested,
+    canAcceptRequest,
     followToView: privacyEnabled,
     companyName: foundUser.companyName || foundUser.username,
     ratingAverage: foundUser.ratingAverage || 0,
@@ -2385,7 +2619,7 @@ app.get("/api/jobs/public", async (req, res) => {
 
 try{
 
-const jobs = await Job.find()
+const jobs = await Job.find({ status: 'open' })
 .populate("employerId","username companyName location profilePicture");
 
 // Try to get user from token if provided

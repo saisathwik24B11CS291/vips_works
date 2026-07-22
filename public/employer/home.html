@@ -176,6 +176,9 @@
         .job-card { background:#111; border:1px solid #222; border-radius:14px; padding:12px; }
         .job-card h4 { margin:0 0 4px 0; color: var(--accent-blue); cursor:pointer; }
         .job-meta { color: var(--text-gray); font-size:12px; margin:2px 0; }
+        .job-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+        .job-action-btn{border:1px solid #333;background:#1a1a1a;color:white;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer;font-size:12px;}
+        .job-action-btn.danger{border-color:#7f1d1d;background:#3a0f0f;color:#fca5a5;}
         .badge { display:inline-block; padding:3px 8px; border-radius:10px; font-size:11px; border:1px solid #333; color:white; }
         .badge.open { background:#113c1c; color:#6ee7b7; border-color:#1f6f3b; }
         .badge.closed { background:#3a0f0f; color:#fca5a5; border-color:#7f1d1d; }
@@ -194,6 +197,12 @@
         .job-modal .close-btn{
             background:#da3633;color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;margin-top:12px;
         }
+        .job-form{display:none;gap:10px;flex-direction:column;margin-top:12px;}
+        .job-form input,.job-form textarea,.job-form select{
+            width:100%;box-sizing:border-box;background:#0b1220;color:white;border:1px solid #30363d;border-radius:10px;padding:10px;
+        }
+        .job-form textarea{min-height:84px;resize:vertical;}
+        .status-line{font-size:12px;color:#9ca3af;margin-top:8px;min-height:16px;}
         /* Modal Overlay with Blur */
 .modal-overlay {
     position: fixed;
@@ -344,6 +353,26 @@
         <p><strong>Details:</strong><br><span id="job-detail-description"></span></p>
         <p><strong>Tasks:</strong><br><span id="job-detail-tasks"></span></p>
         <p><strong>Posted on:</strong> <span id="job-detail-date"></span></p>
+        <div id="job-modal-actions" class="job-actions"></div>
+        <form id="job-edit-form" class="job-form" onsubmit="saveJobEdit(event)">
+          <input id="edit-job-title" maxlength="120" placeholder="Job title">
+          <textarea id="edit-job-details" maxlength="3000" placeholder="Details"></textarea>
+          <input id="edit-job-location" maxlength="180" placeholder="Location">
+          <input id="edit-job-total" maxlength="80" placeholder="Total fee">
+          <input id="edit-job-hourly" maxlength="80" placeholder="Hourly fee">
+          <input id="edit-job-hours" maxlength="80" placeholder="Hours">
+          <input id="edit-job-tasks" maxlength="1000" placeholder="Tasks">
+          <input id="edit-job-category" maxlength="80" placeholder="Category">
+          <select id="edit-job-status">
+            <option value="open">Active</option>
+            <option value="closed">Closed</option>
+          </select>
+          <div style="display:flex;gap:10px;">
+            <button type="submit" class="job-action-btn" style="background:var(--accent-blue);border-color:var(--accent-blue);">Save</button>
+            <button type="button" class="job-action-btn" onclick="hideEditJobForm()">Cancel</button>
+          </div>
+        </form>
+        <div id="job-action-status" class="status-line"></div>
         <button class="close-btn" onclick="closeJobDetails()">Close</button>
       </div>
     </div>
@@ -363,6 +392,7 @@
         const expectedRole = 'employer';
         let myJobs = [];
         let searchTimer = null;
+        let selectedJobIndex = -1;
 
         function enforceEmployerAuth() {
             const storedToken = localStorage.getItem('token');
@@ -466,8 +496,12 @@ function resetDetectBtn() {
                     const data = await res.json();
                     document.getElementById('user-location-display').innerText = data.location;
                     toggleLocationPopup(false);
+                } else {
+                    const data = await res.json().catch(()=>({}));
+                    alert(data.message || "Could not save location");
+                    resetDetectBtn();
                 }
-            } catch (err) { console.error("Update failed", err); }
+            } catch (err) { console.error("Update failed", err); alert("Could not save location"); resetDetectBtn(); }
         }
 
         async function loadHeader() {
@@ -538,12 +572,18 @@ function closeSubSection() {
                 const loc = job.location || job.employerId?.location || "Location not set";
                 const pay = job.totalFee ? `${job.totalFee}` : (job.hourlyFee ? `${job.hourlyFee}/hr` : "Budget not set");
                 const badge = job.status || "open";
+                const statusLabel = badge === "closed" ? "Closed" : "Active";
                 return `
                     <div class="job-card">
                         <h4 onclick="showJobDetails(${idx})">${job.title}</h4>
                         <div class="job-meta"> ${loc}</div>
                         <div class="job-meta"> ${pay}</div>
-                        <span class="badge ${badge}">${badge}</span>
+                        <div class="job-meta">Created: ${formatDate(job.createdAt)}</div>
+                        <span class="badge ${badge}">${statusLabel}</span>
+                        <div class="job-actions">
+                            <button class="job-action-btn" onclick="editJob(${idx})"><i class="fas fa-pen"></i> Edit</button>
+                            <button class="job-action-btn danger" onclick="deleteJob('${job._id}')"><i class="fas fa-trash"></i> Delete</button>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -552,20 +592,122 @@ function closeSubSection() {
         function showJobDetails(idx){
             const job = myJobs[idx];
             if(!job) return;
+            selectedJobIndex = idx;
+            hideEditJobForm();
             const loc = job.location || job.employerId?.location || "Location not set";
             const pay = job.totalFee ? `${job.totalFee}` : (job.hourlyFee ? `${job.hourlyFee}/hr` : "Budget not set");
             document.getElementById('job-detail-title').innerText = job.title || "Job";
-            document.getElementById('job-detail-status').innerText = job.status || "open";
+            document.getElementById('job-detail-status').innerText = (job.status === "closed" ? "Closed" : "Active");
             document.getElementById('job-detail-location').innerText = loc;
             document.getElementById('job-detail-pay').innerText = pay;
             document.getElementById('job-detail-description').innerText = job.details || job.workDetails || "No description provided.";
             document.getElementById('job-detail-tasks').innerText = job.tasks || "Not provided";
-            document.getElementById('job-detail-date').innerText = job.createdAt ? new Date(job.createdAt).toLocaleString() : "Not available";
+            document.getElementById('job-detail-date').innerText = formatDate(job.createdAt);
+            document.getElementById('job-modal-actions').innerHTML = `
+                <button class="job-action-btn" onclick="showEditJobForm(${idx})"><i class="fas fa-pen"></i> Edit</button>
+                <button class="job-action-btn danger" onclick="deleteJob('${job._id}')"><i class="fas fa-trash"></i> Delete</button>
+            `;
+            setJobStatus("");
             document.getElementById('job-detail-modal').style.display = 'flex';
         }
 
         function closeJobDetails(){
             document.getElementById('job-detail-modal').style.display = 'none';
+        }
+
+        function formatDate(value){
+            return value ? new Date(value).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : "Not available";
+        }
+
+        function editJob(idx){
+            showJobDetails(idx);
+            showEditJobForm(idx);
+        }
+
+        function showEditJobForm(idx=selectedJobIndex){
+            const job = myJobs[idx];
+            if(!job) return;
+            selectedJobIndex = idx;
+            document.getElementById('edit-job-title').value = job.title || "";
+            document.getElementById('edit-job-details').value = job.details || "";
+            document.getElementById('edit-job-location').value = job.location || "";
+            document.getElementById('edit-job-total').value = job.totalFee || "";
+            document.getElementById('edit-job-hourly').value = job.hourlyFee || "";
+            document.getElementById('edit-job-hours').value = job.hours || "";
+            document.getElementById('edit-job-tasks').value = job.tasks || "";
+            document.getElementById('edit-job-category').value = job.category || "";
+            document.getElementById('edit-job-status').value = job.status === "closed" ? "closed" : "open";
+            document.getElementById('job-edit-form').style.display = 'flex';
+        }
+
+        function hideEditJobForm(){
+            const form = document.getElementById('job-edit-form');
+            if(form) form.style.display = 'none';
+        }
+
+        function setJobStatus(message, isError=false){
+            const el=document.getElementById('job-action-status');
+            if(!el)return;
+            el.innerText=message||"";
+            el.style.color=isError ? '#fca5a5' : '#9ca3af';
+        }
+
+        async function saveJobEdit(event){
+            event.preventDefault();
+            const job = myJobs[selectedJobIndex];
+            if(!job) return;
+            const payload = {
+                title: document.getElementById('edit-job-title').value.trim(),
+                details: document.getElementById('edit-job-details').value.trim(),
+                location: document.getElementById('edit-job-location').value.trim(),
+                totalFee: document.getElementById('edit-job-total').value.trim(),
+                hourlyFee: document.getElementById('edit-job-hourly').value.trim(),
+                hours: document.getElementById('edit-job-hours').value.trim(),
+                tasks: document.getElementById('edit-job-tasks').value.trim(),
+                category: document.getElementById('edit-job-category').value.trim(),
+                status: document.getElementById('edit-job-status').value
+            };
+            if(!payload.title || !payload.details || !payload.totalFee || !payload.hours){
+                setJobStatus("Title, details, total fee and hours are required.", true);
+                return;
+            }
+            setJobStatus("Saving...");
+            try{
+                const res=await fetch(`${API_BASE}/api/jobs/${job._id}`,{
+                    method:"PUT",
+                    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                });
+                const data=await res.json().catch(()=>({}));
+                if(!res.ok) throw new Error(data.message || "Update failed");
+                myJobs[selectedJobIndex]=data.job;
+                renderMyJobs();
+                showJobDetails(selectedJobIndex);
+                setJobStatus(data.message || "Job updated successfully");
+            }catch(err){
+                setJobStatus(err.message || "Update failed", true);
+            }
+        }
+
+        async function deleteJob(jobId){
+            if(!jobId) return;
+            if(!confirm("Delete this job post? Workers will no longer see or access it.")) return;
+            setJobStatus("Deleting...");
+            try{
+                const res=await fetch(`${API_BASE}/api/jobs/${jobId}`,{
+                    method:"DELETE",
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                const data=await res.json().catch(()=>({}));
+                if(!res.ok) throw new Error(data.message || "Delete failed");
+                myJobs = myJobs.filter(job => job._id !== jobId);
+                renderMyJobs();
+                closeJobDetails();
+                alert(data.message || "Job deleted successfully");
+            }catch(err){
+                setJobStatus(err.message || "Delete failed", true);
+                alert(err.message || "Delete failed");
+            }
         }
 
         async function checkRequests(){
@@ -609,43 +751,40 @@ function closeSubSection() {
         const searchInput = document.getElementById('main-search');
         const suggestionsBox = document.getElementById('search-suggestions');
 
-        function buildSuggestions(term){
+        async function buildSuggestions(term){
             const t = term.trim().toLowerCase();
             if(!t){
                 suggestionsBox.style.display = 'none';
                 return;
             }
-            const suggestions = [];
-            // main categories
-            Object.keys(jobData).forEach(cat=>{
-                const cl = cat.toLowerCase();
-                if(cl.includes(t) || t.includes(cl)){
-                    suggestions.push({label: cat+" Jobs", tag:"Category", action: `goCategory('${cat}')`});
-                }
-                jobData[cat].forEach(sub=>{
-                    const sl = sub.toLowerCase();
-                    if(sl.includes(t) || t.includes(sl)){
-                        suggestions.push({label: sub, tag: cat, action: `goWorkerList('${sub}')`});
-                    }
+            suggestionsBox.style.display = 'block';
+            suggestionsBox.innerHTML = `<div class="suggest-item"><span>Searching...</span><span class="suggest-tag">Live</span></div>`;
+            try{
+                const res = await fetch(`${API_BASE}/api/search/global?q=${encodeURIComponent(t)}`,{
+                    headers:{'Authorization':`Bearer ${token}`}
                 });
-            });
-            // my jobs
-            myJobs.forEach((job,idx)=>{
-                const blob = `${job.title||""} ${job.location||""}`.toLowerCase();
-                if(blob.includes(t)){
-                    suggestions.push({label: job.title || "Job", tag:"My Post", action: `goMyJob(${idx})`});
+                const suggestions = res.ok ? await res.json() : [];
+                if(!suggestions.length){
+                    suggestionsBox.innerHTML = `<div class="suggest-item"><span>No Results Found</span><span class="suggest-tag">0</span></div>`;
+                    return;
                 }
-            });
-            suggestionsBox.innerHTML = suggestions.slice(0,8).map(s=>`
-                <div class="suggest-item" onclick="${s.action};hideSuggestions();">
-                    <span>${s.label}</span>
-                    <span class="suggest-tag">${s.tag}</span>
+                suggestionsBox.innerHTML = suggestions.slice(0,10).map(s=>`
+                <div class="suggest-item" onclick="openSearchResult('${encodeURIComponent(s.url || '')}');hideSuggestions();">
+                    <span>${s.title}</span>
+                    <span class="suggest-tag">${labelType(s.type)}</span>
                 </div>
-            `).join('');
-            suggestionsBox.style.display = suggestions.length ? 'block' : 'none';
+                `).join('');
+            }catch(err){
+                suggestionsBox.innerHTML = `<div class="suggest-item"><span>No Results Found</span><span class="suggest-tag">Error</span></div>`;
+            }
         }
 
         function hideSuggestions(){ suggestionsBox.style.display='none'; }
+        function labelType(type){ return ({job:"Job",service:"Service",post:"Post",worker:"Worker",employer:"Employer"}[type] || "Result"); }
+        function openSearchResult(encodedUrl){
+            const url = decodeURIComponent(encodedUrl || "");
+            if(url) window.location.href = url;
+        }
         function goWorkerList(job){ window.location.href = `worker-list.html?job=${encodeURIComponent(job)}`; }
         function goCategory(cat){ openSubSection(cat); }
         function goMyJob(idx){ showJobDetails(idx); }
