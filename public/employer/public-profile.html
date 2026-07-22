@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employer Public Profile | VIPs</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    :root{--bg:#0d1117;--card:#161b22;--muted:#8b949e;--text:#f8fafc;--line:#30363d;--blue:#3b82f6;--green:#22c55e;}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);padding-bottom:76px}
+    .shell{max-width:920px;margin:0 auto;padding:18px}
+    .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .icon-btn{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:#111827;color:white;cursor:pointer}
+    .hero{border:1px solid var(--line);background:linear-gradient(145deg,#111827,#0b1220);border-radius:16px;overflow:hidden}
+    .cover{height:180px;background:linear-gradient(135deg,#1f2937,#0f172a);display:flex;align-items:center;justify-content:center;color:#64748b}
+    .cover img{width:100%;height:100%;object-fit:cover}
+    .identity{padding:0 20px 20px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:end}
+    .avatar{width:104px;height:104px;border-radius:18px;border:4px solid var(--bg);margin-top:-44px;background:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;overflow:hidden}
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    h1{margin:0;font-size:clamp(24px,4vw,38px);letter-spacing:0}
+    .meta{color:var(--muted);margin:6px 0 0;display:flex;gap:12px;flex-wrap:wrap;font-size:14px}
+    .verify{color:#93c5fd;font-size:14px}
+    .follow{border:none;border-radius:10px;padding:12px 18px;background:var(--blue);color:white;font-weight:800;cursor:pointer;min-width:128px}
+    .follow.secondary{background:#21262d;color:#cbd5e1;border:1px solid var(--line)}
+    .grid{display:grid;grid-template-columns:1fr 300px;gap:16px;margin-top:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+    .card h2{margin:0 0 12px;font-size:18px}
+    .text{color:#cbd5e1;line-height:1.6;font-size:14px}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .stat{background:#0f1620;border:1px solid #223044;border-radius:12px;padding:12px;text-align:center}
+    .stat b{display:block;font-size:20px}
+    .stat span{color:var(--muted);font-size:12px}
+    .list{display:grid;gap:10px}
+    .job,.post{background:#0f1620;border:1px solid #223044;border-radius:12px;padding:14px}
+    .job h3,.post h3{margin:0 0 6px;font-size:15px}
+    .tagrow{display:flex;flex-wrap:wrap;gap:8px}
+    .tag{border:1px solid #23405f;background:#0b1a2d;color:#bfdbfe;padding:7px 10px;border-radius:999px;font-size:12px}
+    .info{display:grid;gap:12px}
+    .info-row{display:flex;gap:10px;color:#cbd5e1;font-size:14px;align-items:flex-start}
+    .info-row i{color:var(--blue);width:18px;margin-top:2px}
+    a{color:#93c5fd}
+    .empty{color:var(--muted);font-size:14px}
+    .bottom-nav{position:fixed;bottom:0;left:0;width:100%;height:64px;background:#000;border-top:1px solid #262626;display:flex;justify-content:space-around;align-items:center}
+    .nav-item{color:#737373;text-decoration:none;font-size:22px}.nav-item.active{color:white}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.identity{grid-template-columns:1fr}.follow{width:100%}.stats{grid-template-columns:1fr 1fr 1fr}.cover{height:132px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="top">
+      <button class="icon-btn" onclick="history.back()" aria-label="Back"><i class="fas fa-arrow-left"></i></button>
+      <strong>Employer Public Profile</strong>
+      <span></span>
+    </div>
+    <section class="hero">
+      <div class="cover" id="cover">Company Cover</div>
+      <div class="identity">
+        <div class="avatar" id="avatar">V</div>
+        <div>
+          <h1 id="company-name">Loading...</h1>
+          <div class="meta">
+            <span id="employer-name"></span>
+            <span id="category"></span>
+            <span id="verified" class="verify"></span>
+          </div>
+        </div>
+        <button id="follow-btn" class="follow" onclick="toggleFollow()">Follow</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div>
+        <div class="card">
+          <h2>Company Information</h2>
+          <p class="text" id="description">No company description added yet.</p>
+        </div>
+        <div class="card">
+          <h2>Posted Jobs</h2>
+          <div class="list" id="jobs"></div>
+        </div>
+        <div class="card">
+          <h2>Public Posts</h2>
+          <div class="list" id="posts"></div>
+        </div>
+      </div>
+      <aside>
+        <div class="card stats">
+          <div class="stat"><b id="followers">0</b><span>Followers</span></div>
+          <div class="stat"><b id="following">0</b><span>Following</span></div>
+          <div class="stat"><b id="jobs-count">0</b><span>Jobs</span></div>
+        </div>
+        <div class="card">
+          <h2>Details</h2>
+          <div class="info">
+            <div class="info-row"><i class="fas fa-location-dot"></i><span id="location">Location not set</span></div>
+            <div class="info-row"><i class="fas fa-globe"></i><span id="website">Website not available</span></div>
+            <div class="info-row"><i class="fas fa-calendar"></i><span id="join-date">Join date not available</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Services</h2>
+          <div class="tagrow" id="services"></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <a href="../worker/home.html" class="nav-item"><i class="fas fa-home"></i></a>
+    <a href="../search.html" class="nav-item"><i class="fas fa-search"></i></a>
+    <a href="../worker/messages.html" class="nav-item"><i class="far fa-paper-plane"></i></a>
+    <a href="../worker/profile.html" class="nav-item active"><i class="fas fa-user"></i></a>
+  </nav>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const token = localStorage.getItem('token');
+    const id = new URLSearchParams(window.location.search).get('id');
+    let employer = null;
+
+    const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    async function loadProfile(){
+      if(!id){ document.getElementById('company-name').innerText = 'Employer not found'; return; }
+      const res = await fetch(`${API_BASE}/api/employers/public/${id}`, {
+        headers: token ? {'Authorization': `Bearer ${token}`} : {}
+      });
+      const data = await res.json();
+      if(!res.ok){ document.getElementById('company-name').innerText = data.message || 'Employer not found'; return; }
+      employer = data;
+      render();
+    }
+
+    function render(){
+      const name = employer.companyName || employer.username || 'Employer';
+      document.getElementById('company-name').innerText = name;
+      document.getElementById('employer-name').innerText = employer.employerName ? `Employer: ${employer.employerName}` : '';
+      document.getElementById('category').innerText = employer.businessCategory || 'General Business';
+      document.getElementById('verified').innerHTML = employer.verified ? '<i class="fas fa-circle-check"></i> Verified' : '';
+      document.getElementById('description').innerText = employer.companyDescription || 'No company description added yet.';
+      document.getElementById('followers').innerText = employer.followersCount || 0;
+      document.getElementById('following').innerText = employer.followingCount || 0;
+      document.getElementById('jobs-count').innerText = employer.postedJobs?.length || 0;
+      document.getElementById('location').innerText = employer.location || 'Location not set';
+      document.getElementById('join-date').innerText = employer.joinDate ? `Joined ${new Date(employer.joinDate).toLocaleDateString()}` : 'Join date not available';
+      document.getElementById('website').innerHTML = employer.website ? `<a href="${esc(employer.website)}" target="_blank" rel="noopener">${esc(employer.website)}</a>` : 'Website not available';
+      document.getElementById('cover').innerHTML = employer.coverImage ? `<img src="${API_BASE}${employer.coverImage}" alt="">` : 'Company Cover';
+      document.getElementById('avatar').innerHTML = employer.profilePicture ? `<img src="${API_BASE}${employer.profilePicture}" alt="">` : esc(name.charAt(0).toUpperCase());
+      setFollowButton();
+      renderJobs();
+      renderPosts();
+      renderServices();
+    }
+
+    function setFollowButton(){
+      const btn = document.getElementById('follow-btn');
+      if(!token || localStorage.getItem('userRole') !== 'worker'){
+        btn.innerText = 'Worker Login';
+        btn.className = 'follow secondary';
+        return;
+      }
+      btn.disabled = false;
+      btn.className = employer.isFollowing || employer.hasRequested ? 'follow secondary' : 'follow';
+      btn.innerText = employer.isFollowing ? 'Unfollow' : (employer.hasRequested ? 'Requested' : 'Follow');
+    }
+
+    async function toggleFollow(){
+      if(!token || localStorage.getItem('userRole') !== 'worker'){
+        window.location.href = '../worker/login.html';
+        return;
+      }
+      const btn = document.getElementById('follow-btn');
+      btn.disabled = true;
+      btn.innerText = 'Working...';
+      const res = await fetch(`${API_BASE}/api/users/follow/${employer._id}`, {
+        method:'POST',
+        headers:{'Authorization':`Bearer ${token}`}
+      });
+      const result = await res.json().catch(()=>({}));
+      if(res.ok){
+        employer.isFollowing = result.status === 'following' ? true : false;
+        employer.hasRequested = result.status === 'requested';
+        employer.followersCount += result.status === 'following' ? 1 : (result.status === 'unfollowed' ? -1 : 0);
+        render();
+      }else{
+        alert(result.message || 'Action failed');
+        setFollowButton();
+      }
+    }
+
+    function renderJobs(){
+      const jobs = employer.postedJobs || [];
+      document.getElementById('jobs').innerHTML = jobs.length ? jobs.map(job => `
+        <article class="job">
+          <h3>${esc(job.title)}</h3>
+          <div class="text">${esc(job.category || 'Job')} ${job.location ? `- ${esc(job.location)}` : ''}</div>
+          <div class="text">${esc(job.details || job.tasks || 'No details provided.')}</div>
+        </article>`).join('') : '<p class="empty">No open jobs right now.</p>';
+    }
+
+    function renderPosts(){
+      const posts = employer.publicPosts || [];
+      document.getElementById('posts').innerHTML = posts.length ? posts.map(post => `
+        <article class="post">
+          <h3>${esc(post.title || 'Public post')}</h3>
+          <div class="text">${esc(post.description || 'Portfolio update')}</div>
+        </article>`).join('') : '<p class="empty">No public posts yet.</p>';
+    }
+
+    function renderServices(){
+      const services = employer.services?.length ? employer.services : [employer.businessCategory || 'General Business'];
+      document.getElementById('services').innerHTML = services.map(service => `<span class="tag">${esc(service)}</span>`).join('');
+    }
+
+    loadProfile();
+  </script>
+  <script src="../js/i18n.js"></script>
+</body>
+</html>

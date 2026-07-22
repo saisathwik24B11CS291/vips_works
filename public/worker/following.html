@@ -63,7 +63,7 @@
                     const name = user.companyName || user.username || 'User';
                     const role = user.role === 'employer' ? 'Employer' : 'Worker';
                     const href = user.role === 'employer'
-                        ? `../employer/profile.html?id=${user._id}`
+                        ? `../employer/public-profile.html?id=${user._id}`
                         : `profile.html?id=${user._id}`;
                     const avatar = user.profilePicture
                         ? `<img src="${API_BASE}${user.profilePicture}" class="avatar" alt="">`

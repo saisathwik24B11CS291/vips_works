@@ -36,7 +36,10 @@ const EmployerSchema = new mongoose.Schema({
     
     notifications: [{
         type: { type: String }, 
-        user: { type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }, 
+        user: { type: mongoose.Schema.Types.ObjectId, refPath: 'notifications.userModel' }, 
+        userModel: { type: String, enum: ['Worker', 'Employer'], default: 'Worker' },
+        message: { type: String, default: '' },
+        link: { type: String, default: '' },
         date: { type: Date, default: Date.now },
         read: { type: Boolean, default: false }
     }],

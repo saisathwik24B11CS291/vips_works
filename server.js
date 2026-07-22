@@ -16,6 +16,8 @@ const dns = require('dns').promises;
 const crypto = require('crypto');
 const JobInvite = require("./models/JobInvite");
 const JobApplication = require("./models/JobApplication");
+const PendingSignup = require('./models/PendingSignup');
+const Job = require('./models/job');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const { OAuth2Client } = require('google-auth-library');
@@ -616,6 +618,17 @@ async function findUserById(id, role) {
     return Employer.findById(id);
 }
 
+async function getOptionalViewer(req) {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return null;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return findUserById(decoded.id, decoded.role);
+    } catch {
+        return null;
+    }
+}
+
 // --- AUTH ROUTES ---
 // Unified Signup: Handles both Worker and Employer safely
 app.post('/api/auth/signup', async (req, res) => {
@@ -1193,7 +1206,7 @@ app.get('/api/search/global', async (req, res) => {
                     id: project._id,
                     title: project.title || 'Portfolio post',
                     subtitle: user.companyName || user.username || 'Profile showcase',
-                    url: user.role === 'employer' ? `/employer/profile.html?id=${user._id}&project=${project._id}` : `/worker/profile.html?id=${user._id}&project=${project._id}`
+                    url: user.role === 'employer' ? `/employer/public-profile.html?id=${user._id}&project=${project._id}` : `/worker/profile.html?id=${user._id}&project=${project._id}`
                 }))
         ).slice(0, 8);
 
@@ -1221,7 +1234,7 @@ app.get('/api/search/global', async (req, res) => {
                 title: employer.companyName || employer.username,
                 subtitle: employer.mainCategory || 'Employer',
                 image: employer.profilePicture || '',
-                url: viewerRole === 'employer' ? `/employer/profile.html?id=${employer._id}` : `/friendprofile.html?id=${employer._id}`
+                url: viewerRole === 'employer' ? `/employer/profile.html?id=${employer._id}` : `/employer/public-profile.html?id=${employer._id}`
             }))
         ];
 
@@ -1229,6 +1242,66 @@ app.get('/api/search/global', async (req, res) => {
     } catch (err) {
         console.error('Global search failed:', err);
         res.status(500).json({ message: 'Search failed' });
+    }
+});
+
+app.get('/api/employers/public/:id', async (req, res) => {
+    try {
+        const employerId = req.params.id;
+        if (!mongoose.Types.ObjectId.isValid(employerId)) {
+            return res.status(400).json({ message: "Invalid employer" });
+        }
+
+        const employer = await Employer.findById(employerId)
+            .select('username companyName profilePicture coverImage bio location website services mainCategory followers following followRequests projects ratingAverage ratingCount subscription createdAt')
+            .lean();
+
+        if (!employer) return res.status(404).json({ message: "Employer not found" });
+
+        const viewer = await getOptionalViewer(req);
+        const viewerId = viewer?._id?.toString();
+        const openJobs = await Job.find({ employerId, status: 'open' })
+            .select('title details hourlyFee totalFee hours location tasks category createdAt')
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+
+        const followers = employer.followers || [];
+        const followRequests = employer.followRequests || [];
+        const isFollowing = Boolean(viewerId && followers.some(id => id.toString() === viewerId));
+        const hasRequested = Boolean(viewerId && followRequests.some(id => id.toString() === viewerId));
+        const subscription = getSubscriptionState(employer);
+
+        res.json({
+            _id: employer._id,
+            role: 'employer',
+            companyName: employer.companyName || employer.username,
+            username: employer.username,
+            employerName: employer.username,
+            profilePicture: employer.profilePicture || '',
+            coverImage: employer.coverImage || '',
+            bio: employer.bio || '',
+            companyDescription: employer.bio || '',
+            location: employer.location || '',
+            website: employer.website || '',
+            services: employer.services || [],
+            mainCategory: employer.mainCategory || 'General Business',
+            businessCategory: employer.mainCategory || 'General Business',
+            postedJobs: openJobs,
+            publicPosts: employer.projects || [],
+            followersCount: followers.length,
+            followingCount: (employer.following || []).length,
+            joinDate: employer.createdAt || null,
+            verified: Boolean(subscription.premium),
+            ratingAverage: employer.ratingAverage || 0,
+            ratingCount: employer.ratingCount || 0,
+            isFollowing,
+            hasRequested,
+            viewerRole: viewer?.role || null
+        });
+    } catch (err) {
+        console.error("Employer public profile error:", err);
+        res.status(500).json({ message: "Failed to load employer profile" });
     }
 });
 
@@ -1732,13 +1805,39 @@ app.get('/api/notifications', async (req, res) => {
         const token = req.headers.authorization?.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        const user = await Worker.findById(decoded.id).populate('notifications.user', 'username profilePicture role') ||
-                     await Employer.findById(decoded.id).populate('notifications.user', 'username profilePicture role');
+        const user = await Worker.findById(decoded.id) || await Employer.findById(decoded.id);
             
         if (!user) return res.json([]);
-        const sortedNotifs = (user.notifications || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const rawNotifs = user.notifications || [];
+        const actorIds = rawNotifs.map(n => n.user).filter(Boolean);
+        const [workers, employers] = await Promise.all([
+            Worker.find({ _id: { $in: actorIds } }).select('username profilePicture role').lean(),
+            Employer.find({ _id: { $in: actorIds } }).select('username companyName profilePicture role').lean()
+        ]);
+        const actors = new Map([...workers, ...employers].map(actor => [actor._id.toString(), actor]));
+        const sortedNotifs = rawNotifs
+            .map(notification => {
+                const item = notification.toObject ? notification.toObject() : notification;
+                const actor = item.user ? actors.get(item.user.toString()) : null;
+                return { ...item, user: actor || item.user };
+            })
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
         res.json(sortedNotifs);
     } catch (err) { res.status(500).json({ message: "Server Error" }); }
+});
+
+app.post('/api/notifications/mark-read', authMiddleware, async (req, res) => {
+    try {
+        req.user.notifications = (req.user.notifications || []).map(notification => {
+            notification.read = true;
+            return notification;
+        });
+        await req.user.save();
+        res.json({ message: "Notifications marked as read" });
+    } catch (err) {
+        console.error("Mark notifications read failed:", err);
+        res.status(500).json({ message: "Failed to mark notifications as read" });
+    }
 });
 // --- GET ALL PENDING REQUESTS ---
 app.get('/api/users/requests', async (req, res) => {
@@ -1848,8 +1947,6 @@ app.post('/api/profile/heartbeat', async (req, res) => {
         res.sendStatus(200);
     } catch (err) { res.sendStatus(500); }
 });
-const Job = require('./models/job');
-
 app.get('/api/reviews/user/:userId', async (req, res) => {
     try {
         const reviews = await Review.find({ revieweeId: req.params.userId })
@@ -2551,7 +2648,22 @@ message: cleanMessage
 
 await invite.save();
 
-res.json({message:"Invite sent successfully"});
+const employerName = req.user.companyName || req.user.username || "An employer";
+await Worker.findByIdAndUpdate(workerId, {
+$push: {
+notifications: {
+type: "invite_sent",
+user: employerId,
+userModel: "Employer",
+message: `${employerName} has invited you.`,
+link: "/worker/home.html",
+date: new Date(),
+read: false
+}
+}
+});
+
+res.json({message:"Invite sent successfully", inviteId: invite._id, inviteSent: true});
 
 }catch(err){
 
@@ -2598,16 +2710,42 @@ try {
 
 const employerId = req.user._id;
 const workerId = req.params.workerId;
-const { jobTitle } = req.body;
+const cleanJobTitle = String(req.body?.jobTitle || "Job Opportunity").trim().slice(0, 120);
+if (req.user.role !== 'employer') {
+return res.status(403).json({message:"Only employers can cancel invites"});
+}
+if (!mongoose.Types.ObjectId.isValid(workerId)) {
+return res.status(400).json({message:"Invalid worker"});
+}
 
-await JobInvite.deleteOne({
-employerId:req.user._id,
-workerId:req.params.workerId,
-jobTitle,
-status:"pending"
+const query = {
+employerId,
+workerId,
+status: { $in: ["pending", "accepted"] }
+};
+if (cleanJobTitle) query.jobTitle = cleanJobTitle;
+
+const invite = await JobInvite.findOneAndDelete(query);
+if (!invite) {
+return res.status(404).json({message:"Active invite not found"});
+}
+
+const employerName = req.user.companyName || req.user.username || "An employer";
+await Worker.findByIdAndUpdate(workerId, {
+$push: {
+notifications: {
+type: "invite_cancelled",
+user: employerId,
+userModel: "Employer",
+message: `${employerName} cancelled the invitation.`,
+link: "/worker/home.html",
+date: new Date(),
+read: false
+}
+}
 });
 
-res.json({message:"Invite cancelled"});
+res.json({message:"Invite cancelled", inviteSent: false, inviteId: invite._id});
 
 } catch(err){
 console.error(err);

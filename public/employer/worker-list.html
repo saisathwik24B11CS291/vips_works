@@ -399,6 +399,12 @@ if (!res.ok) {
     throw new Error(result.message || 'Invite failed');
 }
 
+btn.outerHTML = `
+<button 
+onclick="cancelInvite('${workerId}', this)"
+style="background:#da3633;color:white;width:90px;border:none;border-radius:10px;cursor:pointer;">
+Cancel
+</button>`;
 await loadWorkers(selectedJob);
 
 }catch(err){
@@ -408,7 +414,7 @@ console.error(err);
 btn.disabled = false;
 btn.innerHTML = '<i class="fas fa-plus"></i>';
 
-alert("Invite failed");
+alert(err.message || "Invite failed");
 
 }
 
@@ -439,6 +445,12 @@ if (!res.ok) {
     throw new Error(result.message || 'Cancel failed');
 }
 
+btn.outerHTML = `
+<button 
+onclick="sendInvite('${workerId}', this)"
+style="background:#21262d;border:1px solid #30363d;color:#00f076;width:50px;border-radius:10px;cursor:pointer;">
+<i class="fas fa-plus"></i>
+</button>`;
 await loadWorkers(selectedJob);
 
 }catch(err){
@@ -448,7 +460,7 @@ console.error(err);
 btn.disabled = false;
 btn.innerHTML = "Cancel";
 
-alert("Cancel failed");
+alert(err.message || "Cancel failed");
 
 }
 

@@ -1,197 +1,127 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Follow Requests</title>
-    <style>
-        body { 
-            margin: 0; 
-            font-family: 'Inter', sans-serif; 
-            background-color: #000000; 
-            color: white; 
-            padding: 20px;
-        }
-
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .back-btn {
-            color: white;
-            text-decoration: none;
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        h2 { margin: 0; font-size: 20px; }
-
-        .request-card {
-            background: #121212;
-            border: 1px solid #262626;
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .avatar {
-            width: 45px; 
-            height: 45px; 
-            border-radius: 50%; 
-            background: #333;
-            object-fit: cover;
-        }
-
-        .name { font-weight: bold; font-size: 14px; display: block; }
-        .role { color: #94a3b8; font-size: 12px; }
-
-        .btn-group { display: flex; gap: 8px; }
-
-        .btn {
-            border: none;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .btn-confirm { background: #22c55e; color: white; }
-        .btn-delete { background: #334155; color: white; }
-
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications | VIPs</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    :root{--bg:#000;--card:#121212;--line:#262626;--text:#fff;--muted:#94a3b8;--blue:#3b82f6;--green:#22c55e;--red:#ef4444}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);padding:18px 18px 78px}
+    .shell{max-width:680px;margin:0 auto}
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .back{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:#111;color:white;cursor:pointer}
+    h1{font-size:22px;margin:0}
+    .badge{background:#111827;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:7px 11px;font-size:12px}
+    .list{display:grid;gap:12px}
+    .card{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .card.unread{border-color:#1d4ed8;background:#0b1426}
+    .icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#1f2937;color:#93c5fd;flex:0 0 auto}
+    .icon.invite_sent{background:#052e16;color:#86efac}.icon.invite_cancelled{background:#3b0a0a;color:#fca5a5}
+    .content{flex:1;min-width:0}
+    .title{font-weight:800;margin-bottom:4px}
+    .message{color:#cbd5e1;font-size:14px;line-height:1.45}
+    .date{color:var(--muted);font-size:12px;margin-top:8px}
+    .empty{border:1px dashed var(--line);border-radius:14px;padding:34px;text-align:center;color:var(--muted)}
+    .action{margin-top:10px;display:inline-flex;align-items:center;gap:8px;border:1px solid #334155;background:#111827;color:white;border-radius:10px;padding:8px 10px;text-decoration:none;font-size:13px}
+    .bottom-nav{position:fixed;bottom:0;left:0;width:100%;height:64px;background:#000;border-top:1px solid #262626;display:flex;justify-content:space-around;align-items:center}
+    .nav-item{color:#737373;text-decoration:none;font-size:22px}.nav-item.active{color:white}
+  </style>
 </head>
 <body>
-
+  <main class="shell">
     <div class="header">
-        <a href="javascript:history.back()" class="back-btn"></a>
-        <h2>Follow Requests</h2>
+      <button class="back" onclick="history.back()" aria-label="Back"><i class="fas fa-arrow-left"></i></button>
+      <h1>Notifications</h1>
+      <span class="badge" id="count-badge">0</span>
     </div>
+    <section class="list" id="list"><div class="empty">Loading notifications...</div></section>
+  </main>
 
-    <div id="requests-list">
-        <p style="color:gray; text-align:center; margin-top:20px;">Loading requests...</p>
-    </div>
+  <nav class="bottom-nav">
+    <a href="home.html" class="nav-item"><i class="fas fa-home"></i></a>
+    <a href="../search.html" class="nav-item"><i class="fas fa-search"></i></a>
+    <a href="messages.html" class="nav-item"><i class="far fa-paper-plane"></i></a>
+    <a href="profile.html" class="nav-item active"><i class="fas fa-user"></i></a>
+  </nav>
 
-    <script>
-    const API_BASE = window.location.origin; 
+  <script>
+    const API_BASE = window.location.origin;
+    const token = localStorage.getItem('token');
+    const list = document.getElementById('list');
+    const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    async function loadFollowRequests() {
-        const token = localStorage.getItem('token');
-        const list = document.getElementById('requests-list');
-
-        if (!token) {
-            window.location.href = 'login.html';
-            return;
-        }
-
-        try {
-            console.log("Fetching from:", `${API_BASE}/api/users/requests`); // CHECK CONSOLE
-            
-            const res = await fetch(`${API_BASE}/api/users/requests`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
-            
-            // 1. Check if Server returned an error (404 or 500)
-            if (!res.ok) {
-                const text = await res.text();
-                throw new Error(`Server Error: ${res.status} - ${text}`);
-            }
-
-            const requests = await res.json();
-            console.log("Data received:", requests); // CHECK CONSOLE
-
-            // 2. Check if data is an Array
-            if (!Array.isArray(requests)) {
-                // Try to find the array if it's nested (e.g. { requests: [...] })
-                if (requests.requests && Array.isArray(requests.requests)) {
-                    // It was nested, so let's use the inner array
-                    renderList(requests.requests, list);
-                    return;
-                }
-                throw new Error("Data format error: Expected an array (list) of requests.");
-            }
-
-            if (requests.length === 0) {
-                list.innerHTML = '<p style="color:gray; text-align:center;">No pending requests.</p>';
-                return;
-            }
-
-            renderList(requests, list);
-
-        } catch (error) {
-            console.error(error);
-            // THIS WILL PRINT THE REAL ERROR ON YOUR SCREEN
-            list.innerHTML = `<p style="color:red; text-align:center; padding:20px;">
-                <strong>Error:</strong> ${error.message}<br>
-                <small>Check Console (F12) for details.</small>
-            </p>`;
-        }
+    function iconFor(type){
+      if(type === 'invite_sent') return 'fa-envelope-open-text';
+      if(type === 'invite_cancelled') return 'fa-ban';
+      if(type === 'accept') return 'fa-circle-check';
+      if(type === 'request') return 'fa-user-plus';
+      return 'fa-bell';
     }
 
-    // Helper function to render the HTML
-    function renderList(data, listElement) {
-        listElement.innerHTML = data.map(req => {
-            // Tries to find the user object safely
-            const user = req.sender || req.follower || req.fromUser || req; 
-            
-            if (!user || !user._id) return `<div style="color:red; padding:10px;">Invalid User Data Found</div>`;
-
-            const profileImg = user.profilePicture 
-                ? `${API_BASE}${user.profilePicture}` 
-                : 'https://via.placeholder.com/45?text=U';
-
-            return `
-            <div class="request-card">
-                <div class="user-info">
-                    <img src="${profileImg}" class="avatar">
-                    <div>
-                        <span class="name">${user.username || "Unknown"}</span>
-                        <span class="role">${user.profession ? user.profession[0] : "Worker"}</span>
-                    </div>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-confirm" onclick="confirmRequest('${user._id}')">Confirm</button>
-                    <button class="btn btn-delete" onclick="deleteRequest('${user._id}')">Delete</button>
-                </div>
-            </div>
-            `;
-        }).join('');
+    function fallbackMessage(item){
+      const actor = item.user?.companyName || item.user?.username || 'Someone';
+      if(item.type === 'invite_sent') return `${actor} has invited you.`;
+      if(item.type === 'invite_cancelled') return `${actor} cancelled the invitation.`;
+      if(item.type === 'accept') return `${actor} accepted your request.`;
+      if(item.type === 'request') return `${actor} sent you a follow request.`;
+      if(item.type === 'follow') return `${actor} started following you.`;
+      return item.message || 'You have a new notification.';
     }
 
-    async function confirmRequest(userId) {
-        // ... (Keep your confirm function same as before)
-        const token = localStorage.getItem('token');
-        if(!userId) return alert("User ID missing");
-        
-        try {
-            const res = await fetch(`${API_BASE}/api/users/confirm/${userId}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                loadFollowRequests(); // Refresh list
-            } else {
-                alert("Failed to confirm");
-            }
-        } catch(e) { alert("Error connecting"); }
+    async function loadNotifications(){
+      if(!token || localStorage.getItem('userRole') !== 'worker'){
+        window.location.href = 'login.html';
+        return;
+      }
+      try{
+        const res = await fetch(`${API_BASE}/api/notifications`, {headers:{'Authorization':`Bearer ${token}`}});
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.message || 'Failed to load notifications');
+        render(Array.isArray(data) ? data : []);
+        await fetch(`${API_BASE}/api/notifications/mark-read`, {method:'POST',headers:{'Authorization':`Bearer ${token}`}});
+      }catch(err){
+        console.error(err);
+        list.innerHTML = '<div class="empty">Could not load notifications right now.</div>';
+      }
     }
 
-    // Run immediately
-    loadFollowRequests();
-</script>
+    function render(items){
+      const unread = items.filter(item => !item.read).length;
+      document.getElementById('count-badge').innerText = unread ? `${unread} unread` : 'All read';
+      if(!items.length){
+        list.innerHTML = '<div class="empty">No notifications yet.</div>';
+        return;
+      }
+      list.innerHTML = items.map(item => {
+        const type = item.type || 'notification';
+        const link = item.link || (type.startsWith('invite') ? 'home.html' : '');
+        const date = item.date ? new Date(item.date).toLocaleString() : '';
+        return `<article class="card ${item.read ? '' : 'unread'}">
+          <div class="icon ${esc(type)}"><i class="fas ${iconFor(type)}"></i></div>
+          <div class="content">
+            <div class="title">${labelFor(type)}</div>
+            <div class="message">${esc(item.message || fallbackMessage(item))}</div>
+            <div class="date">${esc(date)}</div>
+            ${link ? `<a class="action" href="${esc(link)}"><i class="fas fa-arrow-right"></i> Open</a>` : ''}
+          </div>
+        </article>`;
+      }).join('');
+    }
 
-    <script src="../js/i18n.js"></script>
+    function labelFor(type){
+      return ({
+        invite_sent: 'Invitation Sent',
+        invite_cancelled: 'Invitation Cancelled',
+        accept: 'Request Accepted',
+        request: 'Follow Request',
+        follow: 'New Follower'
+      })[type] || 'Notification';
+    }
+
+    loadNotifications();
+  </script>
+  <script src="../js/i18n.js"></script>
 </body>
 </html>
