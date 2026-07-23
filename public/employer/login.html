@@ -71,7 +71,7 @@
         btn.disabled = true;
 
         try {
-            const response = await fetch(window.location.origin + "/api/auth/login", {
+            const response = await fetch(API_BASE + "/api/auth/login", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, role: 'employer' })
@@ -116,7 +116,16 @@
     });
 
     const googleBtnContainer = document.getElementById('google-btn');
-    const API_BASE = window.location.origin;
+    function getApiBase() {
+        const origin = window.location.origin;
+        const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+        if (!origin || origin === 'null') return 'http://localhost:5000';
+        if (isLocalDev && window.location.port && window.location.port !== '5000') {
+            return `${window.location.protocol}//${window.location.hostname}:5000`;
+        }
+        return origin;
+    }
+    const API_BASE = getApiBase();
 
     async function getGoogleClientId(){
         if(window.__googleClientId) return window.__googleClientId;

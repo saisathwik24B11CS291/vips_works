@@ -208,7 +208,17 @@
     </div>
 
     <script>
-        const API_BASE = window.location.origin; // Or "http://127.0.0.1:5000"
+        function getApiBase() {
+            const origin = window.location.origin;
+            const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            if (!origin || origin === 'null') return 'http://localhost:5000';
+            if (isLocalDev && window.location.port && window.location.port !== '5000') {
+                return `${window.location.protocol}//${window.location.hostname}:5000`;
+            }
+            return origin;
+        }
+
+        const API_BASE = getApiBase();
         const loginForm = document.getElementById('login-form');
         const messagePara = document.getElementById('message');
         const submitBtn = document.getElementById('submit-btn');

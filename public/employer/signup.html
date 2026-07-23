@@ -139,7 +139,17 @@
     }
 
     try {
-        const response = await fetch(window.location.origin + "/api/auth/signup", {
+        const apiBase = (() => {
+            const origin = window.location.origin;
+            const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            if (!origin || origin === 'null') return 'http://localhost:5000';
+            if (isLocalDev && window.location.port && window.location.port !== '5000') {
+                return `${window.location.protocol}//${window.location.hostname}:5000`;
+            }
+            return origin;
+        })();
+
+        const response = await fetch(apiBase + "/api/auth/signup", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(signupData)
